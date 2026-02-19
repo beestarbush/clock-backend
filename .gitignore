@@ -1,0 +1,4 @@
+media
+Cargo.lock
+target
+*.tmp

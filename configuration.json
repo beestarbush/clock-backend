@@ -1,0 +1,74 @@
+{
+  "active_app_id": "married-timer",
+  "system-configuration": {
+    "brightness": 0.34,
+    "volume": 0.72,
+    "pendulum-bob-color": "#009950",
+    "pendulum-rod-color": "#333333",
+    "pendulum-background-color": "#000000",
+    "base-color": "#000000",
+    "accent-color": "#009950"
+  },
+  "applications": [
+    {
+      "accent-color": "#bbbbbb",
+      "background": "giphy_3.gif",
+      "background-opacity": 0.5,
+      "base-color": "#000000",
+      "enabled": true,
+      "hour-color": "#995000",
+      "id": "clock",
+      "minute-color": "#005099",
+      "name": "Klok",
+      "order": 0,
+      "second-color": "#009950",
+      "type": "clock",
+      "watchface": "clock"
+    },
+    {
+      "accent-color": "#bbbbbb",
+      "background": "married_vhs.gif",
+      "background-opacity": 0.5,
+      "base-color": "#000000",
+      "enabled": true,
+      "id": "married-timer",
+      "initialized": true,
+      "name": "Trouw Timer",
+      "order": 1,
+      "timestamp": 1730332800,
+      "type": "time-elapsed",
+      "watchface": "seven-segment"
+    },
+    {
+      "accent-color": "#bbbbbb",
+      "background": "StoriesofLightphotography-RandyenNaomi-23.jpg",
+      "background-opacity": 0.5,
+      "base-color": "#693D30",
+      "enabled": true,
+      "id": "kuiken-timer",
+      "initialized": true,
+      "name": "Geboorte Vivienne Timer",
+      "order": 2,
+      "timestamp": 1763337600,
+      "type": "time-elapsed",
+      "watchface": "round-progress-bar"
+    },
+    {
+      "accent-color": "#bbbbbb",
+      "background": "dertig.gif",
+      "background-opacity": 0.5,
+      "base-color": "#000000",
+      "enabled": true,
+      "id": "countdown-timer",
+      "initialized": true,
+      "name": "Verjaardag Naomi Countdown",
+      "order": 3,
+      "timestamp": 788918400,
+      "type": "countdown",
+      "watchface": "countdown"
+    }
+  ],
+  "device_id": "SN-0000",
+  "last_modified": "2026-01-30T07:30:30",
+  "version": "1.0"
+}
