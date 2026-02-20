@@ -1,6 +1,8 @@
 use tokio::fs;
 
-///const BRIGHTNESS_FILE: &str = "/sys/class/backlight/backlight_0/brightness";
+#[cfg(feature = "target-platform")]
+const BRIGHTNESS_FILE: &str = "/sys/class/backlight/backlight_0/brightness";
+#[cfg(not(feature = "target-platform"))]
 const BRIGHTNESS_FILE: &str = "./brightness";
 
 /// Sets the screen brightness (0.0 to 1.0)

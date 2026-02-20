@@ -2,6 +2,7 @@
 name = "clock-backend"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/beestarbush/clock-backend"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,3 +13,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
 
+[features]
+# Enable when cross-compiling for the device
+target-platform = []
