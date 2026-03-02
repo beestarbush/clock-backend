@@ -5,6 +5,11 @@ const BRIGHTNESS_FILE: &str = "/sys/class/backlight/backlight_0/brightness";
 #[cfg(not(feature = "target-platform"))]
 const BRIGHTNESS_FILE: &str = "./brightness";
 
+#[cfg(feature = "target-platform")]
+const TEMPERATURE_FILE: &str = "/sys/class/thermal/thermal_zone0/hwmon0/temp1_input";
+#[cfg(not(feature = "target-platform"))]
+const TEMPERATURE_FILE: &str = "./processor_temperature";
+
 /// Sets the screen brightness (0.0 to 1.0)
 pub async fn set_brightness(val: f32) -> Result<(), String> {
     let pwm_val = (val.clamp(0.0, 1.0) * 255.0) as u32;
@@ -27,4 +32,13 @@ pub async fn set_volume(val: f32) -> Result<(), String> {
     // Placeholder for actual ALSA/PulseAudio system calls
     println!("Hardware: Volume set to {:.2}", val);
     Ok(())
+}
+
+/// Reads the processor temperature in millidegrees Celsius (e.g. 45000 = 45.0°C)
+/// Returns None if the temperature cannot be read
+pub async fn get_temperature() -> Option<f64> {
+    match fs::read_to_string(TEMPERATURE_FILE).await {
+        Ok(content) => content.trim().parse::<f64>().ok(),
+        Err(_) => None,
+    }
 }
