@@ -25,7 +25,6 @@ fn data_path(relative: &str) -> String {
 // --- Data Contract ---
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub active_app_id: String,
     #[serde(rename = "system-configuration")]
     pub system_configuration: SystemConfig,
     pub applications: Vec<Value>, // Keeping apps flexible for now
@@ -36,8 +35,8 @@ pub struct AppConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemConfig {
-    pub brightness: f32,
-    pub volume: f32,
+    pub brightness: u32,
+    pub volume: u32,
     #[serde(rename = "pendulum-bob-color")]
     pub pendulum_bob_color: String,
     #[serde(rename = "pendulum-rod-color")]
@@ -54,8 +53,12 @@ pub struct SystemConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppStatus {
     pub version: Option<String>,
-    pub uptime: Option<f64>,
-    pub temperature: Option<f64>,
+}
+
+// --- Backend Status (computed from backend state) ---
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendStatus {
+    pub uptime: f64,
 }
 
 // --- App State ---
@@ -72,7 +75,7 @@ async fn main() {
     let raw_json = fs::read_to_string(&config_path)
         .unwrap_or_else(|_| panic!("Failed to read {}! Please create it.", config_path));
     let config: AppConfig = serde_json::from_str(&raw_json).expect("Invalid JSON schema");
-    
+
     // Create media directory
     let _ = fs::create_dir_all(data_path("media"));
 
@@ -94,6 +97,13 @@ async fn main() {
     let temp_state = state.clone();
     tokio::spawn(async move {
         poll_temperature(temp_state).await;
+    });
+
+    // 5. Start backend status poller
+    let status_state = state.clone();
+    let backend_start_time = std::time::Instant::now();
+    tokio::spawn(async move {
+        poll_backend_status(status_state, backend_start_time).await;
     });
 
     // Create a robust CORS layer
@@ -220,21 +230,39 @@ async fn handle_request(
             send_result(socket, id, json!(*config)).await;
         }
         "setBrightness" => {
-            if let Some(val) = params["value"].as_f64() {
-                let v = val as f32;
-                let _ = hardware::set_brightness(v).await;
-                state.config.lock().await.system_configuration.brightness = v;
-                config_changed = true;
-                send_result(socket, id, json!({ "brightness": v })).await;
+            if let Some(val) = params["value"].as_i64() {
+                let clamped = val.clamp(0, 100) as u32;
+                let _ = hardware::set_brightness(clamped).await;
+                // Store the percentage (0-100) in config
+                state.config.lock().await.system_configuration.brightness = clamped;
+
+                // Save to disk without publishing (to avoid config reload in app)
+                let current_config = state.config.lock().await.clone();
+                save_config_to_disk(&current_config).await;
+
+                send_result(socket, id, json!({ "brightness": clamped })).await;
             }
         }
         "setVolume" => {
-            if let Some(val) = params["value"].as_f64() {
-                let v = val as f32;
-                let _ = hardware::set_volume(v).await;
-                state.config.lock().await.system_configuration.volume = v;
+            if let Some(val) = params["value"].as_i64() {
+                let clamped = val.clamp(0, 100) as u32;
+                let _ = hardware::set_volume(clamped).await;
+                // Store the percentage (0-100) in config
+                state.config.lock().await.system_configuration.volume = clamped;
+
+                // Save to disk without publishing (to avoid config reload in app)
+                let current_config = state.config.lock().await.clone();
+                save_config_to_disk(&current_config).await;
+
+                send_result(socket, id, json!({ "volume": clamped })).await;
+            }
+        }
+        "setDeviceId" => {
+            if let Some(device_id) = params["device_id"].as_str() {
+                let mut config = state.config.lock().await;
+                config.device_id = device_id.to_string();
                 config_changed = true;
-                send_result(socket, id, json!({ "volume": v })).await;
+                send_result(socket, id, json!({ "device_id": device_id })).await;
             }
         }
         "updateSystemConfig" => {
@@ -248,13 +276,7 @@ async fn handle_request(
             config_changed = true;
             send_result(socket, id, json!({ "status": "updated" })).await;
         }
-        "setActiveApp" => {
-            if let Some(app_id) = params["app_id"].as_str() {
-                state.config.lock().await.active_app_id = app_id.to_string();
-                config_changed = true;
-                send_result(socket, id, json!({ "active_app_id": app_id })).await;
-            }
-        }
+
         "addApp" => {
             let new_app = params.clone();
             state.config.lock().await.applications.push(new_app);
@@ -283,9 +305,48 @@ async fn handle_request(
             let status = state.app_status.lock().await;
             send_result(socket, id, json!(*status)).await;
         }
+        "getTemperature" => {
+            if let Some(temp) = hardware::get_temperature().await {
+                send_result(socket, id, json!({ "temperature": temp })).await;
+            } else {
+                send_result(socket, id, json!({ "temperature": Value::Null })).await;
+            }
+        }
         "getMedia" => {
             let files = list_media_files().await;
             send_result(socket, id, json!({ "files": files })).await;
+        }
+        "shutdown" => {
+            match hardware::shutdown().await {
+                Ok(_) => {
+                    send_result(socket, id, json!({ "status": "shutdown initiated" })).await;
+                }
+                Err(e) => {
+                    let error = json!({
+                        "jsonrpc": "2.0",
+                        "type": "response",
+                        "error": { "code": -32000, "message": e },
+                        "id": id
+                    });
+                    let _ = socket.send(Message::Text(error.to_string())).await;
+                }
+            }
+        }
+        "reboot" => {
+            match hardware::reboot().await {
+                Ok(_) => {
+                    send_result(socket, id, json!({ "status": "reboot initiated" })).await;
+                }
+                Err(e) => {
+                    let error = json!({
+                        "jsonrpc": "2.0",
+                        "type": "response",
+                        "error": { "code": -32000, "message": e },
+                        "id": id
+                    });
+                    let _ = socket.send(Message::Text(error.to_string())).await;
+                }
+            }
         }
         _ => {
             let error = json!({
@@ -324,12 +385,6 @@ async fn handle_publish(state: &Arc<AppState>, msg: &Value) {
             let mut status = state.app_status.lock().await;
             if let Some(v) = params["version"].as_str() {
                 status.version = Some(v.to_string());
-            }
-            if let Some(u) = params["uptime"].as_f64() {
-                status.uptime = Some(u);
-            }
-            if let Some(t) = params["temperature"].as_f64() {
-                status.temperature = Some(t);
             }
             println!("App status updated: {:?}", *status);
         }
@@ -372,8 +427,6 @@ async fn poll_temperature(state: Arc<AppState>) {
 
     loop {
         if let Some(temp) = hardware::get_temperature().await {
-            state.app_status.lock().await.temperature = Some(temp);
-
             let publish_msg = json!({
                 "jsonrpc": "2.0",
                 "type": "publish",
@@ -382,7 +435,27 @@ async fn poll_temperature(state: Arc<AppState>) {
             });
             let _ = state.tx.send(publish_msg.to_string());
         }
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(60)).await;
+    }
+}
+
+/// Periodically publishes backend status (uptime) to subscribers
+async fn poll_backend_status(state: Arc<AppState>, start_time: std::time::Instant) {
+    use tokio::time::{sleep, Duration};
+
+    loop {
+        let uptime = start_time.elapsed().as_secs_f64();
+        let backend_status = BackendStatus { uptime };
+
+        let publish_msg = json!({
+            "jsonrpc": "2.0",
+            "type": "publish",
+            "topic": "backend-status",
+            "params": backend_status
+        });
+        let _ = state.tx.send(publish_msg.to_string());
+
+        sleep(Duration::from_secs(1)).await;
     }
 }
 
@@ -433,7 +506,7 @@ async fn upload_media(mut multipart: axum::extract::Multipart) -> impl axum::res
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         let name = field.name().unwrap_or("").to_string();
         let file_name = field.file_name().unwrap_or("").to_string();
-        
+
         if name == "file" && !file_name.is_empty() {
             if let Ok(data) = field.bytes().await {
                 let path = format!("{}/{}", data_path("media"), file_name);
