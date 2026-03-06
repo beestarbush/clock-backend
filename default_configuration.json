@@ -1,0 +1,15 @@
+{
+  "system-configuration": {
+    "brightness": 75,
+    "volume": 75,
+    "pendulum-bob-color": "#009950",
+    "pendulum-rod-color": "#333333",
+    "pendulum-background-color": "#000000",
+    "base-color": "#000000",
+    "accent-color": "#009950"
+  },
+  "applications": [],
+  "device_id": "SN-XXXX",
+  "last_modified": "2026-03-06T00:00:00",
+  "version": "1.0"
+}
