@@ -8,7 +8,21 @@
     "base-color": "#000000",
     "accent-color": "#009950"
   },
-  "applications": [],
+  "applications": [
+    {
+      "id": "environment-1",
+      "type": "environment",
+      "name": "Air Quality",
+      "watchface": "canary",
+      "order": 99,
+      "enabled": true,
+      "background": "",
+      "backgroundOpacity": 1.0,
+      "duration": 10,
+      "good-threshold": 800,
+      "danger-threshold": 1800
+    }
+  ],
   "device_id": "SN-XXXX",
   "last_modified": "2026-03-06T00:00:00",
   "version": "1.0"

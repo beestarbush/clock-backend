@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 #[cfg(feature = "target-platform")]
@@ -6,9 +7,9 @@ const BRIGHTNESS_FILE: &str = "/sys/class/backlight/11-0045/brightness";
 const BRIGHTNESS_FILE: &str = "./brightness";
 
 #[cfg(feature = "target-platform")]
-const TEMPERATURE_FILE: &str = "/sys/class/thermal/thermal_zone0/hwmon0/temp1_input";
+const PROCESSOR_TEMPERATURE_FILE: &str = "/sys/class/thermal/thermal_zone0/hwmon0/temp1_input";
 #[cfg(not(feature = "target-platform"))]
-const TEMPERATURE_FILE: &str = "./processor_temperature";
+const PROCESSOR_TEMPERATURE_FILE: &str = "./processor_temperature";
 
 /// Sets the screen brightness (0 to 100 percentage)
 pub async fn set_brightness(val: u32) -> Result<(), String> {
@@ -36,10 +37,62 @@ pub async fn set_volume(val: u32) -> Result<(), String> {
 
 /// Reads the processor temperature in millidegrees Celsius (e.g. 45000 = 45.0°C)
 /// Returns None if the temperature cannot be read
-pub async fn get_temperature() -> Option<f64> {
-    match fs::read_to_string(TEMPERATURE_FILE).await {
+pub async fn get_processor_temperature() -> Option<f64> {
+    match fs::read_to_string(PROCESSOR_TEMPERATURE_FILE).await {
         Ok(content) => content.trim().parse::<f64>().ok(),
         Err(_) => None,
+    }
+}
+
+// --- Environment Sensor (SCD40 via IIO sysfs) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvironmentData {
+    pub co2_parts_per_million: f64,
+    pub temperature_celsius: f64,
+    pub humidity_percentage: f64,
+}
+
+#[cfg(feature = "target-platform")]
+const ENVIRONMENT_IIO_BASE: &str = "/sys/devices/platform/axi/1000120000.pcie/1f00074000.i2c/i2c-1/1-0062/iio:device0";
+
+/// Reads CO2, temperature, and humidity from the SCD40 sensor via IIO sysfs.
+/// Returns None if any read or parse fails.
+pub async fn get_environment_data() -> Option<EnvironmentData> {
+    #[cfg(feature = "target-platform")]
+    {
+        async fn read_f64(path: &str) -> Option<f64> {
+            fs::read_to_string(path)
+                .await
+                .ok()?
+                .trim()
+                .parse::<f64>()
+                .ok()
+        }
+
+        let co2_raw = read_f64(&format!("{}/in_concentration_co2_raw", ENVIRONMENT_IIO_BASE)).await?;
+        let co2_scale = read_f64(&format!("{}/in_concentration_co2_scale", ENVIRONMENT_IIO_BASE)).await?;
+
+        let temp_raw = read_f64(&format!("{}/in_temp_raw", ENVIRONMENT_IIO_BASE)).await?;
+        let temp_scale = read_f64(&format!("{}/in_temp_scale", ENVIRONMENT_IIO_BASE)).await?;
+
+        let hum_raw = read_f64(&format!("{}/in_humidityrelative_raw", ENVIRONMENT_IIO_BASE)).await?;
+        let hum_scale = read_f64(&format!("{}/in_humidityrelative_scale", ENVIRONMENT_IIO_BASE)).await?;
+
+        Some(EnvironmentData {
+            co2_parts_per_million: co2_raw * co2_scale,
+            temperature_celsius: (temp_raw * temp_scale) / 1000.0,
+            humidity_percentage: (hum_raw * hum_scale) / 100.0,
+        })
+    }
+
+    #[cfg(not(feature = "target-platform"))]
+    {
+        Some(EnvironmentData {
+            co2_parts_per_million: 750.0,
+            temperature_celsius: 21.5,
+            humidity_percentage: 45.0,
+        })
     }
 }
 

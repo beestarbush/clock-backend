@@ -1,5 +1,7 @@
 mod hardware;
 
+use hardware::EnvironmentData;
+
 use axum::{
     extract::{ws::{Message, WebSocket, WebSocketUpgrade}, State},
     routing::{get, post},
@@ -65,6 +67,7 @@ pub struct BackendStatus {
 struct AppState {
     config: Mutex<AppConfig>,
     app_status: Mutex<AppStatus>,
+    environment: Mutex<Option<EnvironmentData>>,
     tx: broadcast::Sender<String>,
 }
 
@@ -84,6 +87,7 @@ async fn main() {
     let state = Arc::new(AppState {
         config: Mutex::new(config),
         app_status: Mutex::new(AppStatus::default()),
+        environment: Mutex::new(None),
         tx,
     });
 
@@ -93,10 +97,10 @@ async fn main() {
         watch_media_directory(watcher_state).await;
     });
 
-    // 4. Start temperature poller
+    // 4. Start processor temperature poller
     let temp_state = state.clone();
     tokio::spawn(async move {
-        poll_temperature(temp_state).await;
+        poll_processor_temperature(temp_state).await;
     });
 
     // 5. Start backend status poller
@@ -104,6 +108,12 @@ async fn main() {
     let backend_start_time = std::time::Instant::now();
     tokio::spawn(async move {
         poll_backend_status(status_state, backend_start_time).await;
+    });
+
+    // 6. Start environment poller
+    let environment_state = state.clone();
+    tokio::spawn(async move {
+        poll_environment(environment_state).await;
     });
 
     // Create a robust CORS layer
@@ -305,16 +315,20 @@ async fn handle_request(
             let status = state.app_status.lock().await;
             send_result(socket, id, json!(*status)).await;
         }
-        "getTemperature" => {
-            if let Some(temp) = hardware::get_temperature().await {
-                send_result(socket, id, json!({ "temperature": temp })).await;
+        "getProcessorTemperature" => {
+            if let Some(temp) = hardware::get_processor_temperature().await {
+                send_result(socket, id, json!({ "processor_temperature": temp })).await;
             } else {
-                send_result(socket, id, json!({ "temperature": Value::Null })).await;
+                send_result(socket, id, json!({ "processor_temperature": Value::Null })).await;
             }
         }
         "getMedia" => {
             let files = list_media_files().await;
             send_result(socket, id, json!({ "files": files })).await;
+        }
+        "getEnvironment" => {
+            let environment = state.environment.lock().await;
+            send_result(socket, id, json!(*environment)).await;
         }
         "shutdown" => {
             match hardware::shutdown().await {
@@ -449,20 +463,43 @@ async fn save_config_to_disk(config: &AppConfig) {
 }
 
 /// Periodically reads processor temperature, updates AppStatus, and publishes to subscribers
-async fn poll_temperature(state: Arc<AppState>) {
+async fn poll_processor_temperature(state: Arc<AppState>) {
     use tokio::time::{sleep, Duration};
 
     loop {
-        if let Some(temp) = hardware::get_temperature().await {
+        if let Some(temp) = hardware::get_processor_temperature().await {
             let publish_msg = json!({
                 "jsonrpc": "2.0",
                 "type": "publish",
-                "topic": "temperature",
-                "params": { "temperature": temp }
+                "topic": "processor-temperature",
+                "params": { "processor_temperature": temp }
             });
             let _ = state.tx.send(publish_msg.to_string());
         }
         sleep(Duration::from_secs(60)).await;
+    }
+}
+
+/// Periodically reads environment sensor data and publishes to subscribers
+async fn poll_environment(state: Arc<AppState>) {
+    use tokio::time::{sleep, Duration};
+
+    loop {
+        if let Some(environment_data) = hardware::get_environment_data().await {
+            *state.environment.lock().await = Some(environment_data.clone());
+            let publish_msg = json!({
+                "jsonrpc": "2.0",
+                "type": "publish",
+                "topic": "environment",
+                "params": {
+                    "co2_parts_per_million": environment_data.co2_parts_per_million,
+                    "temperature_celsius": environment_data.temperature_celsius,
+                    "humidity_percentage": environment_data.humidity_percentage,
+                }
+            });
+            let _ = state.tx.send(publish_msg.to_string());
+        }
+        sleep(Duration::from_secs(5)).await;
     }
 }
 
