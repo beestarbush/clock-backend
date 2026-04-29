@@ -99,3 +99,94 @@ pub async fn reboot() -> Result<(), String> {
         Ok(())
     }
 }
+
+#[cfg(feature = "target-platform")]
+mod audio {
+    use lazy_static::lazy_static;
+    use rodio::{Decoder, OutputStream, Sink};
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::sync::Mutex;
+
+    lazy_static! {
+        static ref QUEUE_SINK: Mutex<Option<Sink>> = Mutex::new(None);
+    }
+
+    pub fn play_audio_file(media_path: &str, volume: u32, mode: &str) -> Result<(), String> {
+        let file = File::open(media_path).map_err(|e| e.to_string())?;
+        let reader = BufReader::new(file);
+        let source = Decoder::new(reader).map_err(|e| e.to_string())?;
+        let volume_clamped = (volume.clamp(0, 100) as f32) / 100.0;
+
+        let (_stream, stream_handle) = OutputStream::try_default()
+            .map_err(|e| e.to_string())?;
+
+        match mode {
+            "replace" => {
+                let sink = Sink::try_new(&stream_handle)
+                    .map_err(|e| e.to_string())?;
+                sink.set_volume(volume_clamped);
+                sink.append(source);
+                sink.sleep_until_end();
+            }
+            "queue" => {
+                let mut sink_guard = QUEUE_SINK.lock().unwrap();
+                if let Some(ref sink) = *sink_guard {
+                    sink.set_volume(volume_clamped);
+                    sink.append(source);
+                } else {
+                    let sink = Sink::try_new(&stream_handle)
+                        .map_err(|e| e.to_string())?;
+                    sink.set_volume(volume_clamped);
+                    sink.append(source);
+                    *sink_guard = Some(sink);
+                }
+            }
+            "concurrent" | _ => {
+                let sink = Sink::try_new(&stream_handle)
+                    .map_err(|e| e.to_string())?;
+                sink.set_volume(volume_clamped);
+                sink.append(source);
+                sink.sleep_until_end();
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn stop_audio() -> Result<(), String> {
+        let mut sink_guard = QUEUE_SINK.lock().unwrap();
+        if let Some(ref sink) = *sink_guard {
+            sink.stop();
+            *sink_guard = None;
+        }
+        Ok(())
+    }
+}
+
+pub async fn play_audio_file(media_path: &str, volume: u32, mode: &str) -> Result<(), String> {
+    #[cfg(feature = "target-platform")]
+    {
+        audio::play_audio_file(media_path, volume, mode)
+    }
+
+    #[cfg(not(feature = "target-platform"))]
+    {
+        println!("Hardware (Mock): Playing audio file {} at volume {} (mode: {})",
+            media_path, volume, mode);
+        Ok(())
+    }
+}
+
+pub async fn stop_audio() -> Result<(), String> {
+    #[cfg(feature = "target-platform")]
+    {
+        audio::stop_audio()
+    }
+
+    #[cfg(not(feature = "target-platform"))]
+    {
+        println!("Hardware (Mock): Stopping audio playback");
+        Ok(())
+    }
+}

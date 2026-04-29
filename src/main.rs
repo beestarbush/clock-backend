@@ -348,6 +348,23 @@ async fn handle_request(
                 }
             }
         }
+        "playSound" => {
+            if let Some(filename) = params["filename"].as_str() {
+                let mode = params["mode"].as_str().unwrap_or("concurrent");
+                let media_path = data_path(&format!("media/{}", filename));
+                let volume = state.config.lock().await.system_configuration.volume;
+                match hardware::play_audio_file(&media_path, volume, mode).await {
+                    Ok(_) => send_result(socket, id, json!({ "status": "played" })).await,
+                    Err(e) => send_error(socket, id, -32001, &e).await,
+                }
+            }
+        }
+        "stopSound" => {
+            match hardware::stop_audio().await {
+                Ok(_) => send_result(socket, id, json!({ "status": "stopped" })).await,
+                Err(e) => send_error(socket, id, -32002, &e).await,
+            }
+        }
         _ => {
             let error = json!({
                 "jsonrpc": "2.0",
@@ -403,6 +420,16 @@ async fn send_result(socket: &mut WebSocket, id: Value, result: Value) {
         "id": id
     });
     let _ = socket.send(Message::Text(response.to_string())).await;
+}
+
+async fn send_error(socket: &mut WebSocket, id: Value, code: i32, message: &str) {
+    let error = json!({
+        "jsonrpc": "2.0",
+        "type": "response",
+        "error": { "code": code, "message": message },
+        "id": id
+    });
+    let _ = socket.send(Message::Text(error.to_string())).await;
 }
 
 /// Atomically writes the configuration to disk to prevent corruption on power loss
