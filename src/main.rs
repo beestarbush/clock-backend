@@ -323,6 +323,10 @@ async fn handle_request(
             }
         }
         "getMedia" => {
+            let files = list_image_files().await;
+            send_result(socket, id, json!({ "files": files })).await;
+        }
+        "getAllMedia" => {
             let files = list_media_files().await;
             send_result(socket, id, json!({ "files": files })).await;
         }
@@ -538,17 +542,30 @@ async fn list_media_files() -> Vec<String> {
     files
 }
 
+/// Returns only image filenames — sent to the Qt client which handles display only
+async fn list_image_files() -> Vec<String> {
+    let image_extensions = ["gif", "png", "jpg", "jpeg"];
+    list_media_files().await.into_iter().filter(|name| {
+        let ext = std::path::Path::new(name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        image_extensions.contains(&ext.as_str())
+    }).collect()
+}
+
 /// Watches the media directory and publishes changes to subscribers
 async fn watch_media_directory(state: Arc<AppState>) {
     use tokio::time::{sleep, Duration};
 
-    let mut last_files: Vec<String> = list_media_files().await;
+    let mut last_files: Vec<String> = list_image_files().await;
     last_files.sort();
 
     loop {
         sleep(Duration::from_secs(5)).await;
 
-        let mut current_files = list_media_files().await;
+        let mut current_files = list_image_files().await;
         current_files.sort();
 
         if current_files != last_files {
