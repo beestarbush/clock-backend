@@ -80,9 +80,9 @@ pub async fn get_environment_data() -> Option<EnvironmentData> {
         let hum_scale = read_f64(&format!("{}/in_humidityrelative_scale", ENVIRONMENT_IIO_BASE)).await?;
 
         Some(EnvironmentData {
-            co2_parts_per_million: co2_raw * co2_scale,
-            temperature_celsius: (temp_raw * temp_scale) / 1000.0,
-            humidity_percentage: (hum_raw * hum_scale) / 100.0,
+            co2_parts_per_million: co2_raw,
+            temperature_celsius: ((temp_raw * temp_scale) / 1000.0) - 45.0,
+            humidity_percentage: (hum_raw * hum_scale) / 1000.0,
         })
     }
 
