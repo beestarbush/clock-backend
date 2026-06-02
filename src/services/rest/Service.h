@@ -15,13 +15,16 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(const QString& dataDir, QObject* parent = nullptr);
+    explicit Service(QObject* parent = nullptr);
 
     void handleHttpRequest(QTcpSocket* socket,
                            const QByteArray& method,
                            const QString& path,
                            const QHash<QByteArray, QByteArray>& headers,
                            const QByteArray& body);
+
+  signals:
+    void mediaUploaded(const QString& filename);
 
   private:
     void handleUploadMedia(QTcpSocket* socket, const QHash<QByteArray, QByteArray>& headers, const QByteArray& body);
@@ -34,10 +37,8 @@ class Service : public QObject
                       const QByteArray& body = QByteArray());
 
     static QByteArray contentTypeForFile(const QString& filePath);
-
-    QString m_dataDir;
 };
 
 } // namespace Services::Rest
 
-#endif //SERVICES_REST_SERVICE_H
+#endif // SERVICES_REST_SERVICE_H

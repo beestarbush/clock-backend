@@ -3,12 +3,7 @@
 
 #include <QObject>
 
-#include "audio/AudioDriver.h"
-#include "audio/VolumeDriver.h"
-#include "display/BrightnessDriver.h"
-#include "environment/EnvironmentDriver.h"
-#include "environment/TemperatureDriver.h"
-#include "platform/PowerDriver.h"
+#include "platform/Driver.h"
 
 namespace Services
 {
@@ -28,14 +23,9 @@ class Container : public QObject
     friend class ::Services::Container;
 
   private:
-    Hardware::BrightnessDriver m_brightness;
-    Hardware::VolumeDriver m_volume;
-    Hardware::TemperatureDriver m_temperature;
-    Hardware::EnvironmentDriver m_environment;
-    Hardware::PowerDriver m_power;
-    Hardware::AudioDriver m_audio;
+    Platform::Driver m_power;
 };
 
 } // namespace Drivers
 
-#endif //DRIVERS_CONTAINER_H
+#endif // DRIVERS_CONTAINER_H

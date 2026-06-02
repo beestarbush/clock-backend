@@ -1,17 +1,17 @@
-#include "PowerDriver.h"
+#include "Driver.h"
 
 #include <QProcess>
 #include <QStandardPaths>
 
-namespace Drivers::Hardware
+namespace Drivers::Platform
 {
 
-PowerDriver::PowerDriver(QObject* parent)
+Driver::Driver(QObject* parent)
     : QObject(parent)
 {
 }
 
-bool PowerDriver::shutdown(QString* error) const
+bool Driver::shutdown(QString* error) const
 {
     const QString shutdownCmd = QStandardPaths::findExecutable(QStringLiteral("shutdown"));
     if (shutdownCmd.isEmpty()) {
@@ -28,7 +28,7 @@ bool PowerDriver::shutdown(QString* error) const
     return false;
 }
 
-bool PowerDriver::reboot(QString* error) const
+bool Driver::reboot(QString* error) const
 {
     const QString rebootCmd = QStandardPaths::findExecutable(QStringLiteral("reboot"));
     if (rebootCmd.isEmpty()) {
@@ -45,4 +45,4 @@ bool PowerDriver::reboot(QString* error) const
     return false;
 }
 
-} // namespace Drivers::Hardware
+} // namespace Drivers::Platform

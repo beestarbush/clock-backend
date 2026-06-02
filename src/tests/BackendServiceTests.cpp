@@ -1,14 +1,28 @@
 #include <QtTest>
 
+#include <QDir>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 
-#include "drivers/audio/VolumeDriver.h"
-#include "drivers/display/BrightnessDriver.h"
+#include <algorithm>
+
 #include "services/configuration/Service.h"
 #include "services/websocket/Service.h"
 
 namespace
 {
+
+QString useIsolatedWorkingDir(const QTemporaryDir& dir)
+{
+    const QString previous = QDir::currentPath();
+
+    QDir root(dir.path());
+    root.mkpath(QStringLiteral("build"));
+    root.mkpath(QStringLiteral("data"));
+    QDir::setCurrent(root.filePath(QStringLiteral("build")));
+
+    return previous;
+}
 
 void registerTestHandlers(Services::WebSocket::Service& service, Services::Configuration::Service& configuration)
 {
@@ -23,7 +37,18 @@ void registerTestHandlers(Services::WebSocket::Service& service, Services::Confi
     });
 
     service.registerMethodHandler(Services::WebSocket::Method::SetBrightness, [&configuration](const QJsonObject& params) {
-        const QJsonObject result = configuration.setBrightness(params.value("value").toInt());
+        const QJsonValue valueParam = params.value("value");
+        if (!valueParam.isDouble()) {
+            return Result::error(-32000, QStringLiteral("Brightness value must be an integer between 0 and 100"));
+        }
+
+        const int requestedValue = params.value("value").toInt();
+        if (requestedValue < 0 || requestedValue > 100) {
+            return Result::error(-32000, QStringLiteral("Brightness value must be between 0 and 100"));
+        }
+
+        const quint8 brightness = static_cast<quint8>(requestedValue);
+        const QJsonObject result = configuration.setBrightness(brightness);
         if (result.contains("__error")) {
             return Result::error(-32000, result.value("__error").toString());
         }
@@ -40,7 +65,7 @@ class BackendServiceTests : public QObject
   private slots:
     void testGetConfigReturnsFrame();
     void testSetDeviceIdUpdatesConfiguration();
-    void testSetBrightnessClampsAndReturnsValue();
+    void testSetBrightnessOutOfBoundsReturnsError();
     void testUnknownMethodReturnsError();
 };
 
@@ -48,12 +73,14 @@ void BackendServiceTests::testGetConfigReturnsFrame()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
+    const QString previousDir = useIsolatedWorkingDir(dir);
+    const auto restoreDir = qScopeGuard([&previousDir]() {
+        QDir::setCurrent(previousDir);
+    });
 
-    Drivers::Hardware::BrightnessDriver brightness;
-    Drivers::Hardware::VolumeDriver volume;
-    Services::Configuration::Service configuration(brightness, volume, dir.path());
-    QVERIFY(configuration.load());
     Services::WebSocket::Service service;
+    Services::Configuration::Service configuration(service);
+    QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject response = service.processRequestForTest("1", Services::WebSocket::Method::GetConfig);
@@ -70,12 +97,14 @@ void BackendServiceTests::testSetDeviceIdUpdatesConfiguration()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
+    const QString previousDir = useIsolatedWorkingDir(dir);
+    const auto restoreDir = qScopeGuard([&previousDir]() {
+        QDir::setCurrent(previousDir);
+    });
 
-    Drivers::Hardware::BrightnessDriver brightness;
-    Drivers::Hardware::VolumeDriver volume;
-    Services::Configuration::Service configuration(brightness, volume, dir.path());
-    QVERIFY(configuration.load());
     Services::WebSocket::Service service;
+    Services::Configuration::Service configuration(service);
+    QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject setResponse = service.processRequestForTest(
@@ -89,16 +118,18 @@ void BackendServiceTests::testSetDeviceIdUpdatesConfiguration()
     QCOMPARE(getResponse.value("result").toObject().value("device_id").toString(), QString("SN-NEW-123"));
 }
 
-void BackendServiceTests::testSetBrightnessClampsAndReturnsValue()
+void BackendServiceTests::testSetBrightnessOutOfBoundsReturnsError()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
+    const QString previousDir = useIsolatedWorkingDir(dir);
+    const auto restoreDir = qScopeGuard([&previousDir]() {
+        QDir::setCurrent(previousDir);
+    });
 
-    Drivers::Hardware::BrightnessDriver brightness;
-    Drivers::Hardware::VolumeDriver volume;
-    Services::Configuration::Service configuration(brightness, volume, dir.path());
-    QVERIFY(configuration.load());
     Services::WebSocket::Service service;
+    Services::Configuration::Service configuration(service);
+    QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject response = service.processRequestForTest(
@@ -106,19 +137,23 @@ void BackendServiceTests::testSetBrightnessClampsAndReturnsValue()
         Services::WebSocket::Method::SetBrightness,
         QJsonObject{{"value", 999}});
 
-    QCOMPARE(response.value("result").toObject().value("brightness").toInt(), 100);
+    const QJsonObject error = response.value("error").toObject();
+    QCOMPARE(error.value("code").toInt(), -32000);
+    QCOMPARE(error.value("message").toString(), QString("Brightness value must be between 0 and 100"));
 }
 
 void BackendServiceTests::testUnknownMethodReturnsError()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
+    const QString previousDir = useIsolatedWorkingDir(dir);
+    const auto restoreDir = qScopeGuard([&previousDir]() {
+        QDir::setCurrent(previousDir);
+    });
 
-    Drivers::Hardware::BrightnessDriver brightness;
-    Drivers::Hardware::VolumeDriver volume;
-    Services::Configuration::Service configuration(brightness, volume, dir.path());
-    QVERIFY(configuration.load());
     Services::WebSocket::Service service;
+    Services::Configuration::Service configuration(service);
+    QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject response = service.processRequestForTest(

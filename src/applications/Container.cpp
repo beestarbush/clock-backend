@@ -6,14 +6,8 @@ namespace Applications
 {
 
 Container::Container(Services::Container& services, QObject* parent)
-    : QObject(parent),
-            m_ingress(services.m_ingress)
+    : QObject(parent)
 {
-}
-
-bool Container::start(quint16 port)
-{
-        return m_ingress.start(port);
 }
 
 } // namespace Applications

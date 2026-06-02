@@ -7,13 +7,19 @@
 #include <QRegularExpression>
 #include <QTcpSocket>
 
-Q_LOGGING_CATEGORY(BackendQtRestService, "BackendQtRestService")
+Q_LOGGING_CATEGORY(RestService, "RestService")
 
 namespace Services::Rest
 {
 
 namespace
 {
+#ifdef PLATFORM_IS_TARGET
+const QString MEDIA_DIR = QStringLiteral("/data/media");
+#else
+const QString MEDIA_DIR = QStringLiteral("/workdir/data/media");
+#endif
+
 QString safeFileName(const QString& raw)
 {
     return QFileInfo(raw).fileName();
@@ -77,10 +83,10 @@ bool parseMultipartFile(const QByteArray& body, const QByteArray& boundary, QStr
 
 } // namespace
 
-Service::Service(const QString& dataDir, QObject* parent)
-    : QObject(parent),
-      m_dataDir(dataDir)
+Service::Service(QObject* parent)
+    : QObject(parent)
 {
+    qCInfo(RestService) << "REST routes ready: GET /media/<filename>, POST /api/media";
 }
 
 void Service::handleHttpRequest(QTcpSocket* socket,
@@ -129,7 +135,7 @@ void Service::handleUploadMedia(QTcpSocket* socket, const QHash<QByteArray, QByt
         return;
     }
 
-    QDir mediaDir(QDir(m_dataDir).filePath(QStringLiteral("media")));
+    QDir mediaDir(MEDIA_DIR);
     if (!mediaDir.exists() && !mediaDir.mkpath(QStringLiteral("."))) {
         sendResponse(socket, 500, "Internal Server Error", "text/plain", "Failed to create media directory");
         return;
@@ -143,7 +149,8 @@ void Service::handleUploadMedia(QTcpSocket* socket, const QHash<QByteArray, QByt
     out.write(fileData);
     out.close();
 
-    qCInfo(BackendQtRestService) << "Uploaded media file:" << filename;
+    qCInfo(RestService) << "Uploaded media file:" << filename;
+    emit mediaUploaded(filename);
     sendResponse(socket, 200, "OK", "text/plain", "Uploaded");
 }
 
@@ -155,7 +162,7 @@ void Service::handleGetMedia(QTcpSocket* socket, const QString& path)
         return;
     }
 
-    const QString filePath = QDir(m_dataDir).filePath(QStringLiteral("media/%1").arg(fileName));
+    const QString filePath = MEDIA_DIR + QStringLiteral("/%1").arg(fileName);
     QFile file(filePath);
     if (!file.exists() || !file.open(QIODevice::ReadOnly)) {
         sendResponse(socket, 404, "Not Found", "text/plain", "Not Found");

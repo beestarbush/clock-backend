@@ -8,7 +8,7 @@
 
 #include "services/websocket/Frame.h"
 
-Q_LOGGING_CATEGORY(BackendQtWebSocketService, "BackendQtWebSocketService")
+Q_LOGGING_CATEGORY(WebSocketService, "WebSocketService")
 
 namespace Services::WebSocket
 {
@@ -17,12 +17,12 @@ namespace
 {
 using namespace ::Services::WebSocket;
 
-QJsonObject makeResultFrame(const QString& id, const QJsonObject& result)
+QJsonObject makeResultFrame(const QJsonValue& id, const QJsonObject& result)
 {
     return Frame::buildResponse(id, result);
 }
 
-QJsonObject makeErrorFrame(const QString& id, int code, const QString& message)
+QJsonObject makeErrorFrame(const QJsonValue& id, int code, const QString& message)
 {
     return Frame::buildErrorResponse(id, code, message);
 }
@@ -34,9 +34,7 @@ Service::Service(QObject* parent)
       m_handoffServer(new QWebSocketServer(QStringLiteral("clock-backend-handoff"), QWebSocketServer::NonSecureMode, this))
 {
     connect(m_handoffServer, &QWebSocketServer::newConnection, this, &Service::onNewConnection);
-
-    m_periodicPublishTimer.setInterval(1000);
-    connect(&m_periodicPublishTimer, &QTimer::timeout, this, &Service::onPeriodicPublishTick);
+    qCInfo(WebSocketService) << "WebSocket upgrade handler ready at GET /ws (via ingress)";
 }
 
 Service::~Service()
@@ -66,7 +64,7 @@ bool Service::start(quint16 port)
 bool Service::start(const QList<quint16>& ports)
 {
     if (ports.isEmpty()) {
-        qCCritical(BackendQtWebSocketService) << "No websocket ports configured";
+        qCCritical(WebSocketService) << "No websocket ports configured";
         return false;
     }
 
@@ -84,7 +82,7 @@ bool Service::start(const QList<quint16>& ports)
         connect(server, &QWebSocketServer::newConnection, this, &Service::onNewConnection);
 
         if (!server->listen(QHostAddress::Any, port)) {
-            qCCritical(BackendQtWebSocketService) << "Failed to listen on port" << port << ":" << server->errorString();
+            qCCritical(WebSocketService) << "Failed to listen on port" << port << ":" << server->errorString();
             server->deleteLater();
             for (QWebSocketServer* opened : m_servers) {
                 opened->close();
@@ -95,10 +93,9 @@ bool Service::start(const QList<quint16>& ports)
         }
 
         m_servers.append(server);
-        qCInfo(BackendQtWebSocketService) << "clock-backend (Qt) websocket listening on ws://127.0.0.1:" << port;
+        qCInfo(WebSocketService) << QStringLiteral("WebSocket listening on ws://127.0.0.1:%1").arg(port);
     }
 
-    ensureActive();
     return true;
 }
 
@@ -108,7 +105,7 @@ void Service::attachUpgradedSocket(QTcpSocket* socket)
         return;
     }
 
-    ensureActive();
+    qCInfo(WebSocketService) << "Handling upgraded TCP socket from" << socket->peerAddress().toString() << ":" << socket->peerPort();
     m_handoffServer->handleConnection(socket);
 }
 
@@ -122,9 +119,31 @@ void Service::registerPublishHandler(::Services::WebSocket::Topic topic, Publish
     m_publishHandlers.insert(static_cast<int>(topic), std::move(handler));
 }
 
-void Service::registerPeriodicPublisher(::Services::WebSocket::Topic topic, TopicPublisher publisher)
+void Service::registerPeriodicPublisher(::Services::WebSocket::Topic topic, int intervalMs, TopicPublisher publisher)
 {
-    m_periodicPublishers.insert(static_cast<int>(topic), std::move(publisher));
+    const int key = static_cast<int>(topic);
+
+    if (m_periodicPublishers.contains(key)) {
+        auto existing = m_periodicPublishers.take(key);
+        if (existing.timer) {
+            existing.timer->stop();
+            existing.timer->deleteLater();
+        }
+    }
+
+    auto* timer = new QTimer(this);
+    timer->setInterval(intervalMs);
+    connect(timer, &QTimer::timeout, this, [this, topic]() {
+        const auto it = m_periodicPublishers.constFind(static_cast<int>(topic));
+        if (it == m_periodicPublishers.cend() || !it->publisher) {
+            return;
+        }
+
+        publishToSubscribed(topic, it->publisher());
+    });
+
+    m_periodicPublishers.insert(key, PeriodicPublisherRegistration{std::move(publisher), timer});
+    timer->start();
 }
 
 void Service::publish(::Services::WebSocket::Topic topic, const QJsonObject& params)
@@ -149,6 +168,8 @@ void Service::onNewConnection()
         if (!socket) {
             continue;
         }
+
+        qCInfo(WebSocketService) << "WebSocket client connected from" << socket->peerAddress().toString() << ":" << socket->peerPort();
 
         m_clients.append(socket);
         m_subscriptions.insert(socket, {});
@@ -179,13 +200,18 @@ void Service::onTextMessageReceived(const QString& message)
 
     bool looksLikeRequest = Frame::isRequest(msg);
     if (!looksLikeRequest) {
-        looksLikeRequest = msg.contains("method") && msg.contains("id");
+        looksLikeRequest = msg.contains("method");
     }
     if (!looksLikeRequest) {
         return;
     }
 
-    const QString id = Frame::parseId(msg);
+    const QJsonValue id = Frame::parseId(msg);
+    if (!Frame::isValidId(id)) {
+        sendJson(socket, makeErrorFrame(QJsonValue(QJsonValue::Null), -32600, QStringLiteral("Invalid request id")));
+        return;
+    }
+
     const ::Services::WebSocket::Method method = Frame::parseMethod(msg);
     const QJsonObject params = Frame::parseParams(msg);
 
@@ -200,23 +226,14 @@ void Service::onSocketDisconnected()
         return;
     }
 
+    qCInfo(WebSocketService) << "WebSocket client disconnected from" << socket->peerAddress().toString() << ":" << socket->peerPort();
+
     m_subscriptions.remove(socket);
     m_clients.removeAll(socket);
     socket->deleteLater();
 }
 
-void Service::onPeriodicPublishTick()
-{
-    for (auto it = m_periodicPublishers.cbegin(); it != m_periodicPublishers.cend(); ++it) {
-        const auto publisher = it.value();
-        if (!publisher) {
-            continue;
-        }
-        publishToSubscribed(static_cast<::Services::WebSocket::Topic>(it.key()), publisher());
-    }
-}
-
-QJsonObject Service::processRequest(const QString& id,
+QJsonObject Service::processRequest(const QJsonValue& id,
                                     ::Services::WebSocket::Method method,
                                     const QJsonObject& params,
                                     QSet<::Services::WebSocket::Topic>* subscriptions)
@@ -292,13 +309,6 @@ void Service::publishToSubscribed(::Services::WebSocket::Topic topic, const QJso
         if (m_subscriptions[client].contains(topic)) {
             sendJson(client, frame);
         }
-    }
-}
-
-void Service::ensureActive()
-{
-    if (!m_periodicPublishTimer.isActive()) {
-        m_periodicPublishTimer.start();
     }
 }
 

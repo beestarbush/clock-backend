@@ -3,9 +3,9 @@
 
 #include <QObject>
 
-namespace Drivers::Hardware
+namespace Drivers::Platform
 {
-class PowerDriver;
+class Driver;
 }
 
 namespace Services::WebSocket
@@ -21,14 +21,14 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Drivers::Hardware::PowerDriver& power,
-                     Services::WebSocket::Service* websocket = nullptr,
+    explicit Service(Drivers::Platform::Driver& power,
+                     Services::WebSocket::Service& websocket,
                      QObject* parent = nullptr);
 
   private:
-    Drivers::Hardware::PowerDriver& m_power;
+    Drivers::Platform::Driver& m_power;
 };
 
 } // namespace Services::System
 
-#endif //SERVICES_SYSTEM_SERVICE_H
+#endif // SERVICES_SYSTEM_SERVICE_H

@@ -3,7 +3,7 @@
 namespace Services::WebSocket
 {
 
-QJsonObject Frame::buildRequest(const QString& id, Method method, const QJsonObject& params)
+QJsonObject Frame::buildRequest(const QJsonValue& id, Method method, const QJsonObject& params)
 {
     QJsonObject request;
     request["jsonrpc"] = QStringLiteral("2.0");
@@ -14,7 +14,7 @@ QJsonObject Frame::buildRequest(const QString& id, Method method, const QJsonObj
     return request;
 }
 
-QJsonObject Frame::buildResponse(const QString& id, const QJsonObject& result)
+QJsonObject Frame::buildResponse(const QJsonValue& id, const QJsonObject& result)
 {
     QJsonObject response;
     response["jsonrpc"] = QStringLiteral("2.0");
@@ -24,7 +24,22 @@ QJsonObject Frame::buildResponse(const QString& id, const QJsonObject& result)
     return response;
 }
 
-QJsonObject Frame::buildErrorResponse(const QString& id, int code, const QString& message)
+bool Frame::isRequest(const QJsonObject& message)
+{
+    return messageTypeFromString(message.value("type").toString()) == MessageType::Request;
+}
+
+bool Frame::isResponse(const QJsonObject& message)
+{
+    return messageTypeFromString(message.value("type").toString()) == MessageType::Response;
+}
+
+bool Frame::isPublish(const QJsonObject& message)
+{
+    return messageTypeFromString(message.value("type").toString()) == MessageType::Publish;
+}
+
+QJsonObject Frame::buildErrorResponse(const QJsonValue& id, int code, const QString& message)
 {
     QJsonObject response;
     response["jsonrpc"] = QStringLiteral("2.0");
@@ -49,24 +64,14 @@ QJsonObject Frame::buildPublish(Topic topic, const QJsonObject& params)
     return publish;
 }
 
-bool Frame::isRequest(const QJsonObject& message)
+QJsonValue Frame::parseId(const QJsonObject& message)
 {
-    return messageTypeFromString(message.value("type").toString()) == MessageType::Request;
+    return message.value("id");
 }
 
-bool Frame::isResponse(const QJsonObject& message)
+bool Frame::isValidId(const QJsonValue& id)
 {
-    return messageTypeFromString(message.value("type").toString()) == MessageType::Response;
-}
-
-bool Frame::isPublish(const QJsonObject& message)
-{
-    return messageTypeFromString(message.value("type").toString()) == MessageType::Publish;
-}
-
-QString Frame::parseId(const QJsonObject& message)
-{
-    return message.value("id").toString();
+    return id.isString() || id.isDouble();
 }
 
 Method Frame::parseMethod(const QJsonObject& message)

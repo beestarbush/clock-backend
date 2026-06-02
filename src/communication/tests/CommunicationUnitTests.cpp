@@ -119,7 +119,7 @@ void CommunicationUnitTests::testBuildRequestFrame()
     QCOMPARE(request.value("jsonrpc").toString(), QString("2.0"));
     QCOMPARE(request.value("type").toString(), QString("request"));
     QCOMPARE(request.value("method").toString(), QString("setBrightness"));
-    QCOMPARE(request.value("id").toString(), QString("7"));
+    QCOMPARE(request.value("id"), QJsonValue(QString("7")));
     QCOMPARE(request.value("params").toObject().value("value").toInt(), 42);
     QVERIFY(Frame::isRequest(request));
     QVERIFY(!Frame::isResponse(request));
@@ -137,7 +137,7 @@ void CommunicationUnitTests::testBuildResponseFrame()
 
     QCOMPARE(response.value("jsonrpc").toString(), QString("2.0"));
     QCOMPARE(response.value("type").toString(), QString("response"));
-    QCOMPARE(response.value("id").toString(), QString("11"));
+    QCOMPARE(response.value("id"), QJsonValue(QString("11")));
     QCOMPARE(response.value("result").toObject().value("status").toString(), QString("ok"));
     QVERIFY(Frame::isResponse(response));
     QVERIFY(!Frame::isRequest(response));
@@ -152,7 +152,7 @@ void CommunicationUnitTests::testBuildErrorResponseFrame()
 
     QCOMPARE(response.value("jsonrpc").toString(), QString("2.0"));
     QCOMPARE(response.value("type").toString(), QString("response"));
-    QCOMPARE(response.value("id").toString(), QString("99"));
+    QCOMPARE(response.value("id"), QJsonValue(QString("99")));
     QCOMPARE(response.value("error").toObject().value("code").toInt(), -32601);
     QCOMPARE(response.value("error").toObject().value("message").toString(), QString("Method not found"));
     QCOMPARE(Frame::parseErrorMessage(response), QString("Method not found"));
@@ -184,9 +184,13 @@ void CommunicationUnitTests::testFrameParsers()
     params["topic"] = "configuration";
     const QJsonObject request = Frame::buildRequest("123", Method::Subscribe, params);
 
-    QCOMPARE(Frame::parseId(request), QString("123"));
+    QCOMPARE(Frame::parseId(request), QJsonValue(QString("123")));
     QCOMPARE(Frame::parseMethod(request), Method::Subscribe);
     QCOMPARE(Frame::parseParams(request).value("topic").toString(), QString("configuration"));
+
+    const QJsonObject numericIdRequest = Frame::buildRequest(QJsonValue(456), Method::GetConfig, QJsonObject());
+    QCOMPARE(Frame::parseId(numericIdRequest), QJsonValue(456));
+    QVERIFY(Frame::isValidId(Frame::parseId(numericIdRequest)));
 
     QJsonObject responseResult;
     responseResult["files"] = QJsonArray{QJsonValue("a.jpg"), QJsonValue("b.png")};
@@ -195,7 +199,7 @@ void CommunicationUnitTests::testFrameParsers()
     QCOMPARE(Frame::parseResult(response).value("files").toArray().size(), 2);
 
     const QJsonObject publish = Frame::buildPublish(Topic::Environment,
-                                                       QJsonObject{{"temperature_celsius", 21.5}});
+                                                    QJsonObject{{"temperature_celsius", 21.5}});
     QCOMPARE(Frame::parseTopic(publish), Topic::Environment);
     QCOMPARE(Frame::parseParams(publish).value("temperature_celsius").toDouble(), 21.5);
 }

@@ -3,6 +3,7 @@
 
 #include <QHash>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QList>
 #include <QObject>
 #include <QSet>
@@ -25,25 +26,25 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-  struct MethodResult
-  {
-    bool ok;
-    QJsonObject payload;
-    int errorCode;
-    QString errorMessage;
-
-    static MethodResult success(const QJsonObject& result = QJsonObject())
+    struct MethodResult
     {
-      return MethodResult{true, result, 0, {}};
-    }
+        bool ok;
+        QJsonObject payload;
+        int errorCode;
+        QString errorMessage;
 
-    static MethodResult error(int code, const QString& message)
-    {
-      return MethodResult{false, {}, code, message};
-    }
-  };
+        static MethodResult success(const QJsonObject& result = QJsonObject())
+        {
+            return MethodResult{true, result, 0, {}};
+        }
 
-  using MethodHandler = std::function<MethodResult(const QJsonObject& params)>;
+        static MethodResult error(int code, const QString& message)
+        {
+            return MethodResult{false, {}, code, message};
+        }
+    };
+
+    using MethodHandler = std::function<MethodResult(const QJsonObject& params)>;
     using PublishHandler = std::function<void(const QJsonObject& params)>;
     using TopicPublisher = std::function<QJsonObject()>;
 
@@ -56,7 +57,7 @@ class Service : public QObject
 
     void registerMethodHandler(::Services::WebSocket::Method method, MethodHandler handler);
     void registerPublishHandler(::Services::WebSocket::Topic topic, PublishHandler handler);
-    void registerPeriodicPublisher(::Services::WebSocket::Topic topic, TopicPublisher publisher);
+    void registerPeriodicPublisher(::Services::WebSocket::Topic topic, int intervalMs, TopicPublisher publisher);
 
     void publish(::Services::WebSocket::Topic topic, const QJsonObject& params);
 
@@ -68,10 +69,9 @@ class Service : public QObject
     void onNewConnection();
     void onTextMessageReceived(const QString& message);
     void onSocketDisconnected();
-    void onPeriodicPublishTick();
 
   private:
-    QJsonObject processRequest(const QString& id,
+    QJsonObject processRequest(const QJsonValue& id,
                                ::Services::WebSocket::Method method,
                                const QJsonObject& params,
                                QSet<::Services::WebSocket::Topic>* subscriptions = nullptr);
@@ -79,7 +79,12 @@ class Service : public QObject
     void handlePublish(const QJsonObject& message);
     void sendJson(QWebSocket* socket, const QJsonObject& message);
     void publishToSubscribed(::Services::WebSocket::Topic topic, const QJsonObject& params);
-    void ensureActive();
+
+    struct PeriodicPublisherRegistration
+    {
+        TopicPublisher publisher;
+        QTimer* timer;
+    };
 
     QWebSocketServer* m_handoffServer;
     QList<QWebSocketServer*> m_servers;
@@ -87,10 +92,9 @@ class Service : public QObject
     QHash<QWebSocket*, QSet<::Services::WebSocket::Topic>> m_subscriptions;
     QHash<int, MethodHandler> m_methodHandlers;
     QHash<int, PublishHandler> m_publishHandlers;
-    QHash<int, TopicPublisher> m_periodicPublishers;
-    QTimer m_periodicPublishTimer;
+    QHash<int, PeriodicPublisherRegistration> m_periodicPublishers;
 };
 
 } // namespace Services::WebSocket
 
-#endif //SERVICES_WEBSOCKET_SERVICE_H
+#endif // SERVICES_WEBSOCKET_SERVICE_H

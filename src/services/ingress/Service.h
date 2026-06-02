@@ -43,9 +43,8 @@ class Service : public QObject
     Services::Rest::Service& m_rest;
     Services::WebSocket::Service& m_websocket;
     QTcpServer* m_server;
-    QHash<QTcpSocket*, QByteArray> m_requestBuffers;
 };
 
 } // namespace Services::Ingress
 
-#endif //SERVICES_INGRESS_SERVICE_H
+#endif // SERVICES_INGRESS_SERVICE_H

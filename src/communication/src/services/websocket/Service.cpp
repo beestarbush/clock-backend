@@ -12,6 +12,21 @@ namespace Services::WebSocket
 
 const QString PROPERTY_SERVER_URL_DEFAULT = QStringLiteral("ws://127.0.0.1:5000/ws");
 
+namespace
+{
+QString requestIdKey(const QJsonValue& idValue)
+{
+    if (idValue.isString()) {
+        return idValue.toString();
+    }
+    if (idValue.isDouble()) {
+        return QString::number(idValue.toDouble(), 'g', 16);
+    }
+
+    return QString();
+}
+} // namespace
+
 Service::Service(QObject* parent)
     : QObject(parent),
       m_webSocket(QString(), QWebSocketProtocol::VersionLatest, this),
@@ -112,7 +127,8 @@ void Service::subscribe(const Topic& topic)
     request(Method::Subscribe, params, [topic](bool success, const QJsonObject&, const QString& error) {
         if (success) {
             qCDebug(WebSocketService) << "Subscribed to topic:" << topic;
-        } else {
+        }
+        else {
             qCWarning(WebSocketService) << "Failed to subscribe to" << topic << ":" << error;
         }
     });
@@ -131,7 +147,8 @@ void Service::unsubscribe(const Topic& topic)
     request(Method::Unsubscribe, params, [topic](bool success, const QJsonObject&, const QString& error) {
         if (success) {
             qCDebug(WebSocketService) << "Unsubscribed from topic:" << topic;
-        } else {
+        }
+        else {
             qCWarning(WebSocketService) << "Failed to unsubscribe from" << topic << ":" << error;
         }
     });
@@ -184,7 +201,12 @@ void Service::dispatchMessage(const QJsonObject& message)
     qCDebug(WebSocketService) << "<- response/publish" << messageStr;
 
     if (Frame::isResponse(message)) {
-        QString id = Frame::parseId(message);
+        const QString id = requestIdKey(Frame::parseId(message));
+        if (id.isEmpty()) {
+            qCDebug(WebSocketService) << "Received response with invalid request id";
+            return;
+        }
+
         if (!m_pendingRequests.contains(id)) {
             qCDebug(WebSocketService) << "Received response for unknown request id:" << id;
             return;
@@ -217,7 +239,8 @@ void Service::resubscribeAll()
         request(Method::Subscribe, params, [topic](bool success, const QJsonObject&, const QString& error) {
             if (success) {
                 qCDebug(WebSocketService) << "Subscribed to topic:" << topicToString(topic);
-            } else {
+            }
+            else {
                 qCWarning(WebSocketService) << "Failed to subscribe to" << topicToString(topic) << ":" << error;
             }
         });

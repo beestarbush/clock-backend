@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QJsonArray>
+#include <QtTest>
 
 #include "services/configuration/DeviceConfiguration.h"
 
@@ -10,7 +10,7 @@ class DeviceConfigurationUnitTests : public QObject
   private slots:
     void testDefaultState();
     void testToJsonWithAllFields();
-        void testFromJsonWithFrameUnwrap();
+    void testFromJsonWithFrameUnwrap();
     void testFromJsonWithMissingOptionalFields();
     void testFromJsonFiltersInvalidApplications();
     void testApplicationMutations();

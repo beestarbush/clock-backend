@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC OFF)
 set(CMAKE_AUTORCC OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Multimedia Test)
 
 add_subdirectory(communication ${CMAKE_CURRENT_BINARY_DIR}/communication-build)
 
@@ -16,22 +16,16 @@ add_executable(clock_backend
     main.cpp
     drivers/Container.h
     drivers/Container.cpp
-    drivers/display/BrightnessDriver.h
-    drivers/display/BrightnessDriver.cpp
-    drivers/audio/VolumeDriver.h
-    drivers/audio/VolumeDriver.cpp
-    drivers/environment/TemperatureDriver.h
-    drivers/environment/TemperatureDriver.cpp
-    drivers/environment/EnvironmentDriver.h
-    drivers/environment/EnvironmentDriver.cpp
-    drivers/platform/PowerDriver.h
-    drivers/platform/PowerDriver.cpp
-    drivers/audio/AudioDriver.h
-    drivers/audio/AudioDriver.cpp
+    drivers/platform/Driver.h
+    drivers/platform/Driver.cpp
     services/Container.h
     services/Container.cpp
     services/audio/Service.h
     services/audio/Service.cpp
+    services/display/Service.h
+    services/display/Service.cpp
+    services/environment/Service.h
+    services/environment/Service.cpp
     services/websocket/Service.h
     services/websocket/Service.cpp
     services/configuration/Service.h
@@ -54,6 +48,7 @@ target_link_libraries(clock_backend
     PRIVATE
         communication
         Qt6::Core
+        Qt6::Multimedia
         Qt6::Network
         Qt6::WebSockets
 )
@@ -63,16 +58,14 @@ target_include_directories(clock_backend
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+if (CMAKE_CXX_COMPILER MATCHES "aarch64-poky-linux")
+    add_definitions(-DPLATFORM_IS_TARGET)
+elseif(UNIX AND NOT APPLE)
+    add_definitions(-DPLATFORM_IS_HOST)
+endif()
+
 add_executable(clock-backend-qt-unit-tests
     tests/BackendServiceTests.cpp
-    drivers/display/BrightnessDriver.h
-    drivers/display/BrightnessDriver.cpp
-    drivers/audio/VolumeDriver.h
-    drivers/audio/VolumeDriver.cpp
-    drivers/environment/TemperatureDriver.h
-    drivers/environment/TemperatureDriver.cpp
-    drivers/environment/EnvironmentDriver.h
-    drivers/environment/EnvironmentDriver.cpp
     services/websocket/Service.h
     services/websocket/Service.cpp
     services/configuration/Service.h
@@ -87,6 +80,7 @@ target_link_libraries(clock-backend-qt-unit-tests
     PRIVATE
         communication
         Qt6::Core
+        Qt6::Multimedia
         Qt6::Network
         Qt6::WebSockets
         Qt6::Test

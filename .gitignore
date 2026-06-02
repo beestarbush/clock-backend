@@ -1,7 +1,4 @@
-media/
-target
+src/data
 *.tmp
-configuration.json*
-brightness
-processor_temperature
 src/build
+src/git_version.h

@@ -2,9 +2,12 @@
 #define SERVICES_CONTAINER_H
 
 #include <QObject>
+#include <QString>
 
 #include "audio/Service.h"
 #include "configuration/Service.h"
+#include "display/Service.h"
+#include "environment/Service.h"
 #include "ingress/Service.h"
 #include "media/Service.h"
 #include "rest/Service.h"
@@ -30,7 +33,7 @@ class Container : public QObject
     Q_OBJECT
 
   public:
-    explicit Container(Drivers::Container& drivers, const QString& dataDir, QObject* parent = nullptr);
+    explicit Container(Drivers::Container& drivers, QObject* parent = nullptr);
 
     friend class ::Applications::Container;
 
@@ -39,7 +42,9 @@ class Container : public QObject
     Rest::Service m_rest;
     Ingress::Service m_ingress;
     Configuration::Service m_configuration;
+    Display::Service m_display;
     Media::Service m_media;
+    Environment::Service m_environment;
     Status::Service m_status;
     Audio::Service m_audio;
     System::Service m_system;
@@ -47,4 +52,4 @@ class Container : public QObject
 
 } // namespace Services
 
-#endif //SERVICES_CONTAINER_H
+#endif // SERVICES_CONTAINER_H

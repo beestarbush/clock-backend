@@ -1,13 +1,13 @@
 #ifndef SERVICES_AUDIO_SERVICE_H
 #define SERVICES_AUDIO_SERVICE_H
 
+#include <QList>
 #include <QObject>
+#include <QQueue>
 #include <QString>
 
-namespace Drivers::Hardware
-{
-class AudioDriver;
-}
+QT_FORWARD_DECLARE_CLASS(QAudioOutput)
+QT_FORWARD_DECLARE_CLASS(QMediaPlayer)
 
 namespace Services::Configuration
 {
@@ -27,20 +27,32 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Drivers::Hardware::AudioDriver& audio,
-                     Services::Configuration::Service& configuration,
-                     const QString& dataDir,
-                     Services::WebSocket::Service* websocket = nullptr,
+    explicit Service(Services::Configuration::Service& configuration,
+                     Services::WebSocket::Service& websocket,
                      QObject* parent = nullptr);
 
   private:
-    QString mediaPath(const QString& filename) const;
+    struct ActivePlayback
+    {
+        QMediaPlayer* player;
+        QAudioOutput* output;
+    };
 
-    Drivers::Hardware::AudioDriver& m_audio;
+    bool setVolume(quint8 value);
+    bool playAudioFile(const QString& mediaPath, const QString& mode);
+    bool stopAudio();
+
+    void startNextQueuedPlayback();
+    bool startConcurrentPlayback(const QString& mediaPath);
+    void clearQueue();
+
     Services::Configuration::Service& m_configuration;
-    QString m_dataDir;
+    QMediaPlayer* m_queuePlayer;
+    QAudioOutput* m_queueOutput;
+    QQueue<QString> m_queue;
+    QList<ActivePlayback> m_concurrentPlaybacks;
 };
 
 } // namespace Services::Audio
 
-#endif //SERVICES_AUDIO_SERVICE_H
+#endif // SERVICES_AUDIO_SERVICE_H
