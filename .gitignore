@@ -1,6 +1,7 @@
-media
+media/
 target
 *.tmp
 configuration.json*
 brightness
 processor_temperature
+src/build
