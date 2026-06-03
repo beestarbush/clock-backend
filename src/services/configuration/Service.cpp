@@ -10,7 +10,7 @@
 
 #include <algorithm>
 
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 Q_LOGGING_CATEGORY(ConfigurationService, "ConfigurationService")
 
@@ -33,7 +33,7 @@ bool hasOperationError(const QJsonObject& result)
 }
 } // namespace
 
-Service::Service(Services::WebSocket::Service& websocket,
+Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent)
 {
@@ -41,54 +41,54 @@ Service::Service(Services::WebSocket::Service& websocket,
         qCWarning(ConfigurationService) << "Failed to load configuration, using defaults.";
     }
 
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::GetConfig, [this](const QJsonObject&) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetConfig, [this](const QJsonObject&) {
         return Result::success(asJson());
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::SetDeviceId, [this, &websocket](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetDeviceId, [this, &websocket](const QJsonObject& params) {
         const QJsonObject result = setDeviceId(params.value("device_id").toString());
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Services::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
         return Result::success(result);
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::UpdateSystemConfig, [this, &websocket](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::UpdateSystemConfig, [this, &websocket](const QJsonObject& params) {
         const QJsonObject result = updateSystemConfig(params);
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Services::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
         return Result::success(result);
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::AddApp, [this, &websocket](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::AddApp, [this, &websocket](const QJsonObject& params) {
         const QJsonObject result = addApp(params);
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Services::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
         return Result::success(result);
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::UpdateApp, [this, &websocket](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::UpdateApp, [this, &websocket](const QJsonObject& params) {
         const QJsonObject result = updateApp(params);
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Services::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
         return Result::success(result);
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::RemoveApp, [this, &websocket](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::RemoveApp, [this, &websocket](const QJsonObject& params) {
         const QJsonObject result = removeApp(params.value("id").toString());
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Services::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
         return Result::success(result);
     });
 }
@@ -123,7 +123,7 @@ bool Service::load()
         return false;
     }
 
-    m_configuration = DeviceConfiguration::fromJson(doc.object());
+    m_configuration = Common::Communication::Configuration::DeviceConfiguration::fromJson(doc.object());
     if (!m_configuration.systemConfiguration.contains("brightness")) {
         m_configuration.systemConfiguration["brightness"] = 75;
     }

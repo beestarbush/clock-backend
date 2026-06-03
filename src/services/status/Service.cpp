@@ -1,25 +1,25 @@
 #include "Service.h"
 
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 namespace Services::Status
 {
 
-Service::Service(Services::WebSocket::Service& websocket,
+Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent)
 {
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    websocket.registerPeriodicPublisher(Services::WebSocket::Topic::BackendStatus, 1000, [this]() {
+    websocket.registerPeriodicPublisher(Common::Communication::WebSocket::Topic::BackendStatus, 1000, [this]() {
         return backendStatus();
     });
 
-    websocket.registerPublishHandler(Services::WebSocket::Topic::ApplicationStatus, [this](const QJsonObject& params) {
+    websocket.registerPublishHandler(Common::Communication::WebSocket::Topic::ApplicationStatus, [this](const QJsonObject& params) {
         setApplicationStatus(params);
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::GetStatus, [this](const QJsonObject&) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetStatus, [this](const QJsonObject&) {
         return Result::success(appStatus());
     });
 }

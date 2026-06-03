@@ -7,12 +7,12 @@
 QT_FORWARD_DECLARE_CLASS(QTcpServer)
 QT_FORWARD_DECLARE_CLASS(QTcpSocket)
 
-namespace Services::Rest
+namespace Common::Communication::Rest::Server
 {
 class Service;
 }
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -25,8 +25,8 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Services::Rest::Service& rest,
-                     Services::WebSocket::Service& websocket,
+    explicit Service(Common::Communication::Rest::Server::Service& rest,
+                     Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
     bool start(quint16 port = 5000);
@@ -40,8 +40,8 @@ class Service : public QObject
     void processBufferedRequest(QTcpSocket* socket);
     static QHash<QByteArray, QByteArray> parseHeaders(const QList<QByteArray>& headerLines);
 
-    Services::Rest::Service& m_rest;
-    Services::WebSocket::Service& m_websocket;
+    Common::Communication::Rest::Server::Service& m_rest;
+    Common::Communication::WebSocket::Server::Service& m_websocket;
     QTcpServer* m_server;
 };
 

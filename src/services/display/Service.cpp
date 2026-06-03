@@ -6,7 +6,7 @@
 #include <QTextStream>
 
 #include "services/configuration/Service.h"
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 #include <algorithm>
 
@@ -26,18 +26,18 @@ namespace Services::Display
 {
 
 Service::Service(Services::Configuration::Service& configuration,
-                 Services::WebSocket::Service& websocket,
+                 Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent),
       m_configuration(configuration)
 {
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
     if (!setBrightness(static_cast<quint8>(m_configuration.brightness()))) {
         qWarning(DisplayService) << QStringLiteral("Failed to apply configured brightness.");
     }
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::SetBrightness, [this](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetBrightness, [this](const QJsonObject& params) {
         const QJsonValue valueParam = params.value("value");
         if (!valueParam.isDouble()) {
             return Result::error(-32000, QStringLiteral("Brightness value must be an integer between 0 and 100"));

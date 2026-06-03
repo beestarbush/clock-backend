@@ -10,10 +10,10 @@
 #include "environment/Service.h"
 #include "ingress/Service.h"
 #include "media/Service.h"
-#include "rest/Service.h"
+#include "rest/server/Service.h"
 #include "status/Service.h"
 #include "system/Service.h"
-#include "websocket/Service.h"
+#include "websocket/server/Service.h"
 
 namespace Drivers
 {
@@ -38,8 +38,8 @@ class Container : public QObject
     friend class ::Applications::Container;
 
   private:
-    WebSocket::Service m_websocket;
-    Rest::Service m_rest;
+    Common::Communication::WebSocket::Server::Service m_websocket;
+    Common::Communication::Rest::Server::Service m_rest;
     Ingress::Service m_ingress;
     Configuration::Service m_configuration;
     Display::Service m_display;

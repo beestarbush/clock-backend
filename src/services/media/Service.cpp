@@ -5,7 +5,7 @@
 #include <QJsonArray>
 #include <QSet>
 
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 namespace Services::Media
 {
@@ -15,17 +15,17 @@ const QString MEDIA_DIR = QStringLiteral("/data/media");
 const QString MEDIA_DIR = QStringLiteral("/workdir/data/media");
 #endif
 
-Service::Service(Services::WebSocket::Service& websocket, QObject* parent)
+Service::Service(Common::Communication::WebSocket::Server::Service& websocket, QObject* parent)
     : QObject(parent),
       m_websocket(websocket)
 {
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    m_websocket.registerMethodHandler(Services::WebSocket::Method::GetMedia, [this](const QJsonObject&) {
+    m_websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetMedia, [this](const QJsonObject&) {
         return Result::success(QJsonObject{{"files", QJsonArray::fromStringList(listMediaFiles(true))}});
     });
 
-    m_websocket.registerMethodHandler(Services::WebSocket::Method::GetAllMedia, [this](const QJsonObject&) {
+    m_websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetAllMedia, [this](const QJsonObject&) {
         return Result::success(QJsonObject{{"files", QJsonArray::fromStringList(listMediaFiles(false))}});
     });
 
@@ -46,7 +46,7 @@ void Service::publishCurrentMedia()
 {
     m_lastPublishedImages = listMediaFiles(true);
     m_lastPublishedAll = listMediaFiles(false);
-    m_websocket.publish(Services::WebSocket::Topic::Media, buildMediaPayload());
+    m_websocket.publish(Common::Communication::WebSocket::Topic::Media, buildMediaPayload());
 }
 
 QStringList Service::listMediaFiles(bool imageOnly) const
@@ -100,7 +100,7 @@ void Service::publishIfChanged()
 
     m_lastPublishedImages = currentImages;
     m_lastPublishedAll = currentAll;
-    m_websocket.publish(Services::WebSocket::Topic::Media, buildMediaPayload());
+    m_websocket.publish(Common::Communication::WebSocket::Topic::Media, buildMediaPayload());
 }
 
 } // namespace Services::Media

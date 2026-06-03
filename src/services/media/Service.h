@@ -7,7 +7,7 @@
 #include <QStringList>
 #include <QTimer>
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -20,7 +20,7 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Services::WebSocket::Service& websocket,
+    explicit Service(Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
     void start();
@@ -31,7 +31,7 @@ class Service : public QObject
     QJsonObject buildMediaPayload() const;
     void publishIfChanged();
 
-    Services::WebSocket::Service& m_websocket;
+    Common::Communication::WebSocket::Server::Service& m_websocket;
     QTimer m_mediaScanTimer;
     QStringList m_lastPublishedImages;
     QStringList m_lastPublishedAll;

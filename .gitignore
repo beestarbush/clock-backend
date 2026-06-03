@@ -1,4 +1,5 @@
 src/data
 *.tmp
 src/build
+src/build*/
 src/git_version.h

@@ -19,7 +19,7 @@ Container::Container(Drivers::Container& drivers, QObject* parent)
       m_audio(m_configuration, m_websocket),
       m_system(drivers.m_power, m_websocket)
 {
-    connect(&m_rest, &Rest::Service::mediaUploaded, &m_media, [this](const QString&) {
+    connect(&m_rest, &Common::Communication::Rest::Server::Service::mediaUploaded, &m_media, [this](const QString&) {
         m_media.publishCurrentMedia();
     });
 

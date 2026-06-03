@@ -4,16 +4,16 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 
-#include "services/rest/Service.h"
-#include "services/websocket/Service.h"
+#include "rest/server/Service.h"
+#include "websocket/server/Service.h"
 
 Q_LOGGING_CATEGORY(IngressService, "IngressService")
 
 namespace Services::Ingress
 {
 
-Service::Service(Services::Rest::Service& rest,
-                 Services::WebSocket::Service& websocket,
+Service::Service(Common::Communication::Rest::Server::Service& rest,
+                 Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent),
       m_rest(rest),

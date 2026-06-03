@@ -1,6 +1,6 @@
 #include "Service.h"
 
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 #include <QFile>
 #include <QLoggingCategory>
@@ -18,25 +18,25 @@ Q_LOGGING_CATEGORY(EnvironmentService, "EnvironmentService")
 namespace Services::Environment
 {
 
-Service::Service(Services::WebSocket::Service& websocket,
+Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent)
 {
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::GetEnvironment, [this](const QJsonObject&) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetEnvironment, [this](const QJsonObject&) {
         return Result::success(refreshEnvironment());
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::GetProcessorTemperature, [this](const QJsonObject&) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetProcessorTemperature, [this](const QJsonObject&) {
         return Result::success(processorTemperature());
     });
 
-    websocket.registerPeriodicPublisher(Services::WebSocket::Topic::Environment, 5000, [this]() {
+    websocket.registerPeriodicPublisher(Common::Communication::WebSocket::Topic::Environment, 5000, [this]() {
         return refreshEnvironment();
     });
 
-    websocket.registerPeriodicPublisher(Services::WebSocket::Topic::ProcessorTemperature, 60000, [this]() {
+    websocket.registerPeriodicPublisher(Common::Communication::WebSocket::Topic::ProcessorTemperature, 60000, [this]() {
         return processorTemperature();
     });
 }

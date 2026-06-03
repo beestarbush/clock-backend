@@ -7,7 +7,7 @@
 #include <algorithm>
 
 #include "services/configuration/Service.h"
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 namespace
 {
@@ -24,19 +24,19 @@ QString useIsolatedWorkingDir(const QTemporaryDir& dir)
     return previous;
 }
 
-void registerTestHandlers(Services::WebSocket::Service& service, Services::Configuration::Service& configuration)
+void registerTestHandlers(Common::Communication::WebSocket::Server::Service& service, Services::Configuration::Service& configuration)
 {
-    using Result = Services::WebSocket::Service::MethodResult;
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    service.registerMethodHandler(Services::WebSocket::Method::GetConfig, [&configuration](const QJsonObject&) {
+    service.registerMethodHandler(Common::Communication::WebSocket::Method::GetConfig, [&configuration](const QJsonObject&) {
         return Result::success(configuration.asJson());
     });
 
-    service.registerMethodHandler(Services::WebSocket::Method::SetDeviceId, [&configuration](const QJsonObject& params) {
+    service.registerMethodHandler(Common::Communication::WebSocket::Method::SetDeviceId, [&configuration](const QJsonObject& params) {
         return Result::success(configuration.setDeviceId(params.value("device_id").toString()));
     });
 
-    service.registerMethodHandler(Services::WebSocket::Method::SetBrightness, [&configuration](const QJsonObject& params) {
+    service.registerMethodHandler(Common::Communication::WebSocket::Method::SetBrightness, [&configuration](const QJsonObject& params) {
         const QJsonValue valueParam = params.value("value");
         if (!valueParam.isDouble()) {
             return Result::error(-32000, QStringLiteral("Brightness value must be an integer between 0 and 100"));
@@ -78,12 +78,12 @@ void BackendServiceTests::testGetConfigReturnsFrame()
         QDir::setCurrent(previousDir);
     });
 
-    Services::WebSocket::Service service;
+    Common::Communication::WebSocket::Server::Service service;
     Services::Configuration::Service configuration(service);
     QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
-    const QJsonObject response = service.processRequestForTest("1", Services::WebSocket::Method::GetConfig);
+    const QJsonObject response = service.processRequestForTest("1", Common::Communication::WebSocket::Method::GetConfig);
     QCOMPARE(response.value("type").toString(), QString("response"));
     QCOMPARE(response.value("id").toString(), QString("1"));
 
@@ -102,19 +102,19 @@ void BackendServiceTests::testSetDeviceIdUpdatesConfiguration()
         QDir::setCurrent(previousDir);
     });
 
-    Services::WebSocket::Service service;
+    Common::Communication::WebSocket::Server::Service service;
     Services::Configuration::Service configuration(service);
     QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject setResponse = service.processRequestForTest(
         "2",
-        Services::WebSocket::Method::SetDeviceId,
+        Common::Communication::WebSocket::Method::SetDeviceId,
         QJsonObject{{"device_id", "SN-NEW-123"}});
 
     QCOMPARE(setResponse.value("result").toObject().value("device_id").toString(), QString("SN-NEW-123"));
 
-    const QJsonObject getResponse = service.processRequestForTest("3", Services::WebSocket::Method::GetConfig);
+    const QJsonObject getResponse = service.processRequestForTest("3", Common::Communication::WebSocket::Method::GetConfig);
     QCOMPARE(getResponse.value("result").toObject().value("device_id").toString(), QString("SN-NEW-123"));
 }
 
@@ -127,14 +127,14 @@ void BackendServiceTests::testSetBrightnessOutOfBoundsReturnsError()
         QDir::setCurrent(previousDir);
     });
 
-    Services::WebSocket::Service service;
+    Common::Communication::WebSocket::Server::Service service;
     Services::Configuration::Service configuration(service);
     QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject response = service.processRequestForTest(
         "4",
-        Services::WebSocket::Method::SetBrightness,
+        Common::Communication::WebSocket::Method::SetBrightness,
         QJsonObject{{"value", 999}});
 
     const QJsonObject error = response.value("error").toObject();
@@ -151,14 +151,14 @@ void BackendServiceTests::testUnknownMethodReturnsError()
         QDir::setCurrent(previousDir);
     });
 
-    Services::WebSocket::Service service;
+    Common::Communication::WebSocket::Server::Service service;
     Services::Configuration::Service configuration(service);
     QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
     const QJsonObject response = service.processRequestForTest(
         "5",
-        Services::WebSocket::Method::UnknownMethod,
+        Common::Communication::WebSocket::Method::UnknownMethod,
         QJsonObject());
 
     const QJsonObject error = response.value("error").toObject();

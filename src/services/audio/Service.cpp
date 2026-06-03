@@ -8,7 +8,7 @@
 #include <QUrl>
 
 #include "services/configuration/Service.h"
-#include "services/websocket/Service.h"
+#include "websocket/server/Service.h"
 
 #include <algorithm>
 
@@ -23,7 +23,7 @@ const QString MEDIA_DIR = QStringLiteral("/workdir/data/media");
 #endif
 
 Service::Service(Services::Configuration::Service& configuration,
-                 Services::WebSocket::Service& websocket,
+                 Common::Communication::WebSocket::Server::Service& websocket,
                  QObject* parent)
     : QObject(parent),
       m_configuration(configuration),
@@ -47,8 +47,8 @@ Service::Service(Services::Configuration::Service& configuration,
                 startNextQueuedPlayback();
             });
 
-    using Result = Services::WebSocket::Service::MethodResult;
-    websocket.registerMethodHandler(Services::WebSocket::Method::SetVolume, [this](const QJsonObject& params) {
+    using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetVolume, [this](const QJsonObject& params) {
         const QJsonValue valueParam = params.value("value");
         if (!valueParam.isDouble()) {
             return Result::error(-32000, QStringLiteral("Volume value must be an integer between 0 and 100"));
@@ -71,7 +71,7 @@ Service::Service(Services::Configuration::Service& configuration,
         return Result::success(QJsonObject{{"volume", requestedValue}});
     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::PlaySound,
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::PlaySound,
                                     [this](const QJsonObject& params) {
                                         const QString filename = params.value("filename").toString();
                                         const QString mode = params.value("mode").toString(QStringLiteral("concurrent"));
@@ -93,7 +93,7 @@ Service::Service(Services::Configuration::Service& configuration,
                                         return Result::success(QJsonObject{{"status", "played"}});
                                     });
 
-    websocket.registerMethodHandler(Services::WebSocket::Method::StopSound, [this](const QJsonObject&) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::StopSound, [this](const QJsonObject&) {
         if (!stopAudio()) {
             return Result::error(-32002, QStringLiteral("Failed to stop audio"));
         }

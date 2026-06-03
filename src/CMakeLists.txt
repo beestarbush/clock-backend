@@ -10,7 +10,16 @@ set(CMAKE_AUTORCC OFF)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Network WebSockets Multimedia Test)
 
-add_subdirectory(communication ${CMAKE_CURRENT_BINARY_DIR}/communication-build)
+set(CLOCK_COMMON_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libraries)
+
+find_package(ClockCommonLibraries CONFIG QUIET)
+if (NOT ClockCommonLibraries_FOUND)
+    if (EXISTS ${CLOCK_COMMON_LIBRARIES_DIR}/CMakeLists.txt)
+        add_subdirectory(${CLOCK_COMMON_LIBRARIES_DIR} ${CMAKE_CURRENT_BINARY_DIR}/clock-common-libraries-build)
+    else()
+        message(FATAL_ERROR "ClockCommonLibraries not found. Expected submodule at ${CLOCK_COMMON_LIBRARIES_DIR}.")
+    endif()
+endif()
 
 add_executable(clock_backend
     main.cpp
@@ -26,16 +35,12 @@ add_executable(clock_backend
     services/display/Service.cpp
     services/environment/Service.h
     services/environment/Service.cpp
-    services/websocket/Service.h
-    services/websocket/Service.cpp
     services/configuration/Service.h
     services/configuration/Service.cpp
     services/ingress/Service.h
     services/ingress/Service.cpp
     services/media/Service.h
     services/media/Service.cpp
-    services/rest/Service.h
-    services/rest/Service.cpp
     services/status/Service.h
     services/status/Service.cpp
     services/system/Service.h
@@ -46,7 +51,7 @@ add_executable(clock_backend
 
 target_link_libraries(clock_backend
     PRIVATE
-        communication
+        clock_common::communication
         Qt6::Core
         Qt6::Multimedia
         Qt6::Network
@@ -66,8 +71,6 @@ endif()
 
 add_executable(clock-backend-qt-unit-tests
     tests/BackendServiceTests.cpp
-    services/websocket/Service.h
-    services/websocket/Service.cpp
     services/configuration/Service.h
     services/configuration/Service.cpp
     services/media/Service.h
@@ -78,7 +81,7 @@ add_executable(clock-backend-qt-unit-tests
 
 target_link_libraries(clock-backend-qt-unit-tests
     PRIVATE
-        communication
+        clock_common::communication
         Qt6::Core
         Qt6::Multimedia
         Qt6::Network

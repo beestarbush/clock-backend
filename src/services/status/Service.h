@@ -5,7 +5,7 @@
 #include <QJsonObject>
 #include <QObject>
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -18,7 +18,7 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Services::WebSocket::Service& websocket,
+    explicit Service(Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
     void start();

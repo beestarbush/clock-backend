@@ -9,7 +9,7 @@ namespace Services::Configuration
 class Service;
 }
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -23,7 +23,7 @@ class Service : public QObject
 
   public:
     explicit Service(Services::Configuration::Service& configuration,
-                     Services::WebSocket::Service& websocket,
+                     Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
   private:

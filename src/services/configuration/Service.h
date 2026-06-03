@@ -5,9 +5,9 @@
 #include <QObject>
 #include <QString>
 
-#include "services/configuration/DeviceConfiguration.h"
+#include "configuration/DeviceConfiguration.h"
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -20,7 +20,7 @@ class Service : public QObject
     Q_OBJECT
 
   public:
-    explicit Service(Services::WebSocket::Service& websocket,
+    explicit Service(Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
     bool load();
@@ -39,7 +39,7 @@ class Service : public QObject
     QJsonObject removeApp(const QString& appId);
 
   private:
-    Services::Configuration::DeviceConfiguration m_configuration;
+    Common::Communication::Configuration::DeviceConfiguration m_configuration;
 };
 
 } // namespace Services::Configuration

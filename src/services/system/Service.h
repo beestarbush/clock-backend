@@ -8,7 +8,7 @@ namespace Drivers::Platform
 class Driver;
 }
 
-namespace Services::WebSocket
+namespace Common::Communication::WebSocket::Server
 {
 class Service;
 }
@@ -22,7 +22,7 @@ class Service : public QObject
 
   public:
     explicit Service(Drivers::Platform::Driver& power,
-                     Services::WebSocket::Service& websocket,
+                     Common::Communication::WebSocket::Server::Service& websocket,
                      QObject* parent = nullptr);
 
   private:
