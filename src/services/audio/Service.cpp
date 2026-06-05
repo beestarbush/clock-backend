@@ -17,7 +17,7 @@ Q_LOGGING_CATEGORY(AudioService, "AudioService")
 namespace Services::Audio
 {
 #ifdef PLATFORM_IS_TARGET
-const QString MEDIA_DIR = QStringLiteral("/data/media");
+const QString MEDIA_DIR = QStringLiteral("./media");
 #else
 const QString MEDIA_DIR = QStringLiteral("/workdir/data/media");
 #endif

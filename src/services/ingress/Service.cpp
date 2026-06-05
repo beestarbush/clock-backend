@@ -46,9 +46,13 @@ void Service::onNewConnection()
             continue;
         }
 
-        qCDebug(IngressService) << "Accepted TCP connection from" << socket->peerAddress().toString() << ":" << socket->peerPort();
+        qCDebug(IngressService) << "Accepted TCP connection from" << socket->peerAddress().toString() << ":" << socket->peerPort()
+                                << "state=" << socket->state() << "bytesAvailable=" << socket->bytesAvailable();
         connect(socket, &QTcpSocket::readyRead, this, &Service::onSocketReadyRead);
         connect(socket, &QTcpSocket::disconnected, this, &Service::onSocketDisconnected);
+
+        // Try to process immediately in case request bytes were already buffered before signal wiring.
+        processBufferedRequest(socket);
     }
 }
 
@@ -59,6 +63,9 @@ void Service::onSocketReadyRead()
         return;
     }
 
+    qCDebug(IngressService) << "readyRead from" << socket->peerAddress().toString() << ":" << socket->peerPort()
+                            << "bytesAvailable=" << socket->bytesAvailable();
+
     processBufferedRequest(socket);
 }
 
@@ -68,6 +75,8 @@ void Service::onSocketDisconnected()
     if (!socket) {
         return;
     }
+
+    qCDebug(IngressService) << "Socket disconnected from" << socket->peerAddress().toString() << ":" << socket->peerPort();
 
     socket->deleteLater();
 }
@@ -84,7 +93,10 @@ void Service::processBufferedRequest(QTcpSocket* socket)
     // We therefore inspect headers via peek() and only read() for normal REST requests.
     const QByteArray buffer = socket->peek(64 * 1024);
     const int headerEnd = buffer.indexOf("\r\n\r\n");
+    qCDebug(IngressService) << "processBufferedRequest peer=" << socket->peerAddress().toString() << ":" << socket->peerPort()
+                            << "peekSize=" << buffer.size() << "headerEnd=" << headerEnd;
     if (headerEnd < 0) {
+        qCDebug(IngressService) << "Waiting for full HTTP headers from" << socket->peerAddress().toString() << ":" << socket->peerPort();
         return;
     }
 
@@ -98,6 +110,8 @@ void Service::processBufferedRequest(QTcpSocket* socket)
     const QByteArray requestLine = lines.first().trimmed();
     const QList<QByteArray> requestParts = requestLine.split(' ');
     if (requestParts.size() < 3) {
+        qCWarning(IngressService) << "Invalid HTTP request line from" << socket->peerAddress().toString() << ":" << socket->peerPort()
+                                  << "requestLine=" << requestLine;
         socket->disconnectFromHost();
         return;
     }
@@ -105,6 +119,8 @@ void Service::processBufferedRequest(QTcpSocket* socket)
     const QByteArray method = requestParts.at(0).trimmed();
     const QString path = QString::fromUtf8(requestParts.at(1).trimmed());
     const QHash<QByteArray, QByteArray> headers = parseHeaders(lines.mid(1));
+    qCDebug(IngressService) << "Parsed HTTP request method=" << method << "path=" << path
+                            << "from" << socket->peerAddress().toString() << ":" << socket->peerPort();
 
     const QByteArray upgradeHeader = headers.value("upgrade").toLower();
     const QByteArray connectionHeader = headers.value("connection").toLower();
@@ -128,12 +144,17 @@ void Service::processBufferedRequest(QTcpSocket* socket)
     const int contentLength = headers.value("content-length").toInt();
     const int fullLength = headerEnd + 4 + contentLength;
     if (buffer.size() < fullLength) {
+        qCDebug(IngressService) << "Waiting for full HTTP body from" << socket->peerAddress().toString() << ":" << socket->peerPort()
+                                << "bufferSize=" << buffer.size() << "required=" << fullLength;
         return;
     }
 
     // For non-websocket HTTP traffic, consume the buffered request bytes and forward to REST.
     const QByteArray fullRequest = socket->read(fullLength);
     const QByteArray body = fullRequest.mid(headerEnd + 4, contentLength);
+
+    qCDebug(IngressService) << "Forwarding REST request method=" << method << "path=" << path
+                            << "bodyBytes=" << body.size() << "peer=" << socket->peerAddress().toString() << ":" << socket->peerPort();
 
     m_rest.handleHttpRequest(socket, method, path, headers, body);
 }

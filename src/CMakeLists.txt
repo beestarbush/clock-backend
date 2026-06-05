@@ -63,7 +63,7 @@ target_include_directories(clock_backend
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-if (CMAKE_CXX_COMPILER MATCHES "aarch64-poky-linux")
+if (CMAKE_CROSSCOMPILING OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|arm)")
     add_definitions(-DPLATFORM_IS_TARGET)
 elseif(UNIX AND NOT APPLE)
     add_definitions(-DPLATFORM_IS_HOST)

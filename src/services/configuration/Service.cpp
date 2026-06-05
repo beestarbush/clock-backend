@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QLoggingCategory>
 #include <QSaveFile>
@@ -39,6 +40,15 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
 {
     if (!load()) {
         qCWarning(ConfigurationService) << "Failed to load configuration, using defaults.";
+    }
+    else {
+        const QJsonObject snapshot = asJson();
+        const QJsonObject systemConfig = snapshot.value("system-configuration").toObject();
+        qCInfo(ConfigurationService) << "Configuration loaded at startup"
+                                     << "device_id=" << snapshot.value("device_id").toString(QStringLiteral("<missing>"))
+                                     << "applications=" << snapshot.value("applications").toArray().size()
+                                     << "brightness=" << systemConfig.value("brightness").toInt(75)
+                                     << "volume=" << systemConfig.value("volume").toInt(75);
     }
 
     using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
@@ -98,7 +108,10 @@ bool Service::load()
     const QString configurationPath = QDir(DEFAULT_DATA_DIR).filePath(QStringLiteral("configuration.json"));
     QFile file(configurationPath);
 
+    qCInfo(ConfigurationService) << "Loading configuration from" << configurationPath;
+
     if (!file.exists()) {
+        qCWarning(ConfigurationService) << "Configuration file not found, creating default at" << configurationPath;
         m_configuration.version = QStringLiteral("1.0");
         m_configuration.deviceId = QStringLiteral("SN-XXXX");
         m_configuration.systemConfiguration = {
@@ -115,11 +128,14 @@ bool Service::load()
     }
 
     if (!file.open(QIODevice::ReadOnly)) {
+        qCWarning(ConfigurationService) << "Failed to open configuration file" << configurationPath
+                                        << "error=" << file.errorString();
         return false;
     }
 
     const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     if (!doc.isObject()) {
+        qCWarning(ConfigurationService) << "Configuration JSON is invalid in" << configurationPath;
         return false;
     }
 
@@ -130,6 +146,8 @@ bool Service::load()
     if (!m_configuration.systemConfiguration.contains("volume")) {
         m_configuration.systemConfiguration["volume"] = 75;
     }
+
+    qCInfo(ConfigurationService) << "Successfully parsed configuration from" << configurationPath;
     return true;
 }
 

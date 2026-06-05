@@ -3,14 +3,17 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QLoggingCategory>
 #include <QSet>
 
 #include "websocket/server/Service.h"
 
 namespace Services::Media
 {
+Q_LOGGING_CATEGORY(BackendMediaService, "BackendMediaService")
+
 #ifdef PLATFORM_IS_TARGET
-const QString MEDIA_DIR = QStringLiteral("/data/media");
+const QString MEDIA_DIR = QStringLiteral("./media");
 #else
 const QString MEDIA_DIR = QStringLiteral("/workdir/data/media");
 #endif
@@ -35,8 +38,18 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket, Q
 
 void Service::start()
 {
+    const QString resolvedMediaDir = QDir(MEDIA_DIR).absolutePath();
+    qCInfo(BackendMediaService) << "Media service startup using directory" << resolvedMediaDir;
+
     m_lastPublishedImages = listMediaFiles(true);
     m_lastPublishedAll = listMediaFiles(false);
+
+    qCInfo(BackendMediaService) << "Media files available at startup"
+                                << "images=" << m_lastPublishedImages.size()
+                                << "all=" << m_lastPublishedAll.size()
+                                << "imageFiles=" << m_lastPublishedImages
+                                << "allFiles=" << m_lastPublishedAll;
+
     if (!m_mediaScanTimer.isActive()) {
         m_mediaScanTimer.start();
     }
@@ -53,6 +66,7 @@ QStringList Service::listMediaFiles(bool imageOnly) const
 {
     QDir dir(MEDIA_DIR);
     if (!dir.exists()) {
+        qCWarning(BackendMediaService) << "Media directory does not exist:" << QDir(MEDIA_DIR).absolutePath();
         return {};
     }
 
