@@ -87,6 +87,11 @@ void Service::processBufferedRequest(QTcpSocket* socket)
         return;
     }
 
+    // Guard against duplicate processing during websocket handover races.
+    if (socket->property("ingress.websocketHandoverComplete").toBool()) {
+        return;
+    }
+
     // Important: for websocket upgrades we must NOT consume the HTTP upgrade bytes here.
     // QWebSocketServer::handleConnection expects to parse the original handshake request
     // from the socket. If ingress reads those bytes first, websocket connection setup fails.
@@ -135,6 +140,7 @@ void Service::processBufferedRequest(QTcpSocket* socket)
 
     if (websocketUpgradeRequested) {
         // Hand off the untouched socket to websocket service so Qt can complete the handshake.
+        socket->setProperty("ingress.websocketHandoverComplete", true);
         qCInfo(IngressService) << "WebSocket upgrade request accepted from" << socket->peerAddress().toString() << ":" << socket->peerPort();
         disconnect(socket, nullptr, this, nullptr);
         m_websocket.attachUpgradedSocket(socket);
