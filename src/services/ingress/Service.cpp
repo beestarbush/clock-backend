@@ -90,8 +90,14 @@ void Service::processBufferedRequest(QTcpSocket* socket)
     // Important: for websocket upgrades we must NOT consume the HTTP upgrade bytes here.
     // QWebSocketServer::handleConnection expects to parse the original handshake request
     // from the socket. If ingress reads those bytes first, websocket connection setup fails.
-    // We therefore inspect headers via peek() and only read() for normal REST requests.
-    const QByteArray buffer = socket->peek(64 * 1024);
+    // We therefore inspect the full currently buffered request via peek() and only read()
+    // for normal REST requests.
+    const qint64 bufferedBytes = socket->bytesAvailable();
+    if (bufferedBytes <= 0) {
+        return;
+    }
+
+    const QByteArray buffer = socket->peek(bufferedBytes);
     const int headerEnd = buffer.indexOf("\r\n\r\n");
     qCDebug(IngressService) << "processBufferedRequest peer=" << socket->peerAddress().toString() << ":" << socket->peerPort()
                             << "peekSize=" << buffer.size() << "headerEnd=" << headerEnd;
