@@ -30,6 +30,8 @@ Service::Service(Services::Configuration::Service& configuration,
       m_queuePlayer(new QMediaPlayer(this)),
       m_queueOutput(new QAudioOutput(this))
 {
+    m_queuePlayer->setAudioOutput(m_queueOutput);
+
     if (!setVolume(m_configuration.volume())) {
         qWarning(AudioService) << QStringLiteral("Failed to apply configured volume.");
     }
@@ -43,7 +45,9 @@ Service::Service(Services::Configuration::Service& configuration,
     connect(m_queuePlayer,
             &QMediaPlayer::errorOccurred,
             this,
-            [this](QMediaPlayer::Error, const QString&) {
+            [this](QMediaPlayer::Error, const QString& errorString) {
+                qCWarning(AudioService) << "Queued playback failed for"
+                                       << m_queuePlayer->source().toString() << ":" << errorString;
                 startNextQueuedPlayback();
             });
 
@@ -127,12 +131,13 @@ void Service::startNextQueuedPlayback()
 
     while (!m_queue.isEmpty()) {
         const QString nextPath = m_queue.dequeue();
-        if (!QFileInfo::exists(nextPath)) {
+        const QFileInfo nextInfo(nextPath);
+        if (!nextInfo.exists() || !nextInfo.isFile()) {
             qCWarning(AudioService) << "Queued audio file does not exist:" << nextPath;
             continue;
         }
 
-        m_queuePlayer->setSource(QUrl::fromLocalFile(nextPath));
+        m_queuePlayer->setSource(QUrl::fromLocalFile(nextInfo.absoluteFilePath()));
         m_queuePlayer->play();
         return;
     }
@@ -140,6 +145,12 @@ void Service::startNextQueuedPlayback()
 
 bool Service::startConcurrentPlayback(const QString& mediaPath)
 {
+    const QFileInfo mediaInfo(mediaPath);
+    if (!mediaInfo.exists() || !mediaInfo.isFile()) {
+        qCWarning(AudioService) << "Concurrent audio file does not exist:" << mediaPath;
+        return false;
+    }
+
     auto* output = new QAudioOutput(this);
     output->setVolume(static_cast<float>(m_configuration.volume()) / 100.0f);
 
@@ -167,12 +178,13 @@ bool Service::startConcurrentPlayback(const QString& mediaPath)
     connect(player,
             &QMediaPlayer::errorOccurred,
             this,
-            [cleanup](QMediaPlayer::Error, const QString&) {
+            [cleanup, mediaPath](QMediaPlayer::Error, const QString& errorString) {
+                qCWarning(AudioService) << "Concurrent playback failed for" << mediaPath << ":" << errorString;
                 cleanup();
             });
 
     m_concurrentPlaybacks.append({player, output});
-    player->setSource(QUrl::fromLocalFile(mediaPath));
+    player->setSource(QUrl::fromLocalFile(mediaInfo.absoluteFilePath()));
     player->play();
 
     return true;
