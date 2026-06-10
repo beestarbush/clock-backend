@@ -27,6 +27,9 @@ class Service : public QObject
     bool save();
 
     QJsonObject asJson() const;
+    QJsonObject asSystemConfigJson() const;
+    QJsonObject asApplicationListJson() const;
+    QJsonObject asApplicationDetailJson(const QString& appId) const;
     int brightness() const;
     int volume() const;
 

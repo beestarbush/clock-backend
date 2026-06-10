@@ -47,12 +47,12 @@ Service::Service(Services::Configuration::Service& configuration,
             this,
             [this](QMediaPlayer::Error, const QString& errorString) {
                 qCWarning(AudioService) << "Queued playback failed for"
-                                       << m_queuePlayer->source().toString() << ":" << errorString;
+                                        << m_queuePlayer->source().toString() << ":" << errorString;
                 startNextQueuedPlayback();
             });
 
     using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
-    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetVolume, [this](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetVolume, [this, &websocket](const QJsonObject& params) {
         const QJsonValue valueParam = params.value("value");
         if (!valueParam.isDouble()) {
             return Result::error(-32000, QStringLiteral("Volume value must be an integer between 0 and 100"));
@@ -71,6 +71,8 @@ Service::Service(Services::Configuration::Service& configuration,
         if (configResult.contains("__error")) {
             return Result::error(-32000, configResult.value("__error").toString());
         }
+
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, m_configuration.asSystemConfigJson());
 
         return Result::success(QJsonObject{{"volume", requestedValue}});
     });

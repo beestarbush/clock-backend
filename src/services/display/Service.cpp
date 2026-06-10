@@ -37,7 +37,7 @@ Service::Service(Services::Configuration::Service& configuration,
         qWarning(DisplayService) << QStringLiteral("Failed to apply configured brightness.");
     }
 
-    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetBrightness, [this](const QJsonObject& params) {
+    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetBrightness, [this, &websocket](const QJsonObject& params) {
         const QJsonValue valueParam = params.value("value");
         if (!valueParam.isDouble()) {
             return Result::error(-32000, QStringLiteral("Brightness value must be an integer between 0 and 100"));
@@ -57,6 +57,8 @@ Service::Service(Services::Configuration::Service& configuration,
         if (configResult.contains("__error")) {
             return Result::error(-32000, configResult.value("__error").toString());
         }
+
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, m_configuration.asSystemConfigJson());
 
         return Result::success(QJsonObject{{"brightness", requestedValue}});
     });

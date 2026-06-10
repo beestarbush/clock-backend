@@ -28,10 +28,6 @@ void registerTestHandlers(Common::Communication::WebSocket::Server::Service& ser
 {
     using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    service.registerMethodHandler(Common::Communication::WebSocket::Method::GetConfig, [&configuration](const QJsonObject&) {
-        return Result::success(configuration.asJson());
-    });
-
     service.registerMethodHandler(Common::Communication::WebSocket::Method::SetDeviceId, [&configuration](const QJsonObject& params) {
         return Result::success(configuration.setDeviceId(params.value("device_id").toString()));
     });
@@ -63,13 +59,13 @@ class BackendServiceTests : public QObject
     Q_OBJECT
 
   private slots:
-    void testGetConfigReturnsFrame();
+    void testConfigurationSnapshotContainsExpectedFields();
     void testSetDeviceIdUpdatesConfiguration();
     void testSetBrightnessOutOfBoundsReturnsError();
     void testUnknownMethodReturnsError();
 };
 
-void BackendServiceTests::testGetConfigReturnsFrame()
+void BackendServiceTests::testConfigurationSnapshotContainsExpectedFields()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -83,11 +79,7 @@ void BackendServiceTests::testGetConfigReturnsFrame()
     QVERIFY(configuration.load());
     registerTestHandlers(service, configuration);
 
-    const QJsonObject response = service.processRequestForTest("1", Common::Communication::WebSocket::Method::GetConfig);
-    QCOMPARE(response.value("type").toString(), QString("response"));
-    QCOMPARE(response.value("id").toString(), QString("1"));
-
-    const QJsonObject result = response.value("result").toObject();
+    const QJsonObject result = configuration.asJson();
     QVERIFY(result.contains("system-configuration"));
     QVERIFY(result.contains("applications"));
     QVERIFY(result.contains("device_id"));
@@ -114,8 +106,7 @@ void BackendServiceTests::testSetDeviceIdUpdatesConfiguration()
 
     QCOMPARE(setResponse.value("result").toObject().value("device_id").toString(), QString("SN-NEW-123"));
 
-    const QJsonObject getResponse = service.processRequestForTest("3", Common::Communication::WebSocket::Method::GetConfig);
-    QCOMPARE(getResponse.value("result").toObject().value("device_id").toString(), QString("SN-NEW-123"));
+    QCOMPARE(configuration.asJson().value("device_id").toString(), QString("SN-NEW-123"));
 }
 
 void BackendServiceTests::testSetBrightnessOutOfBoundsReturnsError()

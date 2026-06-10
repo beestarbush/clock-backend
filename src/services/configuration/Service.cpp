@@ -53,8 +53,16 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
 
     using Result = Common::Communication::WebSocket::Server::Service::MethodResult;
 
-    websocket.registerMethodHandler(Common::Communication::WebSocket::Method::GetConfig, [this](const QJsonObject&) {
-        return Result::success(asJson());
+    websocket.registerInitialValueProvider(Common::Communication::WebSocket::Topic::Configuration, [this](const QJsonObject&) {
+        return asSystemConfigJson();
+    });
+
+    websocket.registerInitialValueProvider(Common::Communication::WebSocket::Topic::ApplicationList, [this](const QJsonObject&) {
+        return asApplicationListJson();
+    });
+
+    websocket.registerInitialValueProvider(Common::Communication::WebSocket::Topic::ApplicationDetail, [this](const QJsonObject& params) {
+        return asApplicationDetailJson(params.value("id").toString());
     });
 
     websocket.registerMethodHandler(Common::Communication::WebSocket::Method::SetDeviceId, [this, &websocket](const QJsonObject& params) {
@@ -62,7 +70,7 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asSystemConfigJson());
         return Result::success(result);
     });
 
@@ -71,7 +79,7 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asSystemConfigJson());
         return Result::success(result);
     });
 
@@ -80,7 +88,12 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::ApplicationList, asApplicationListJson());
+
+        const QString appId = params.value("id").toString();
+        if (!appId.isEmpty()) {
+            websocket.publish(Common::Communication::WebSocket::Topic::ApplicationDetail, asApplicationDetailJson(appId));
+        }
         return Result::success(result);
     });
 
@@ -89,7 +102,10 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
+        const QString appId = params.value("id").toString();
+        if (!appId.isEmpty()) {
+            websocket.publish(Common::Communication::WebSocket::Topic::ApplicationDetail, asApplicationDetailJson(appId));
+        }
         return Result::success(result);
     });
 
@@ -98,7 +114,7 @@ Service::Service(Common::Communication::WebSocket::Server::Service& websocket,
         if (hasOperationError(result)) {
             return Result::error(-32000, result.value("__error").toString());
         }
-        websocket.publish(Common::Communication::WebSocket::Topic::Configuration, asJson());
+        websocket.publish(Common::Communication::WebSocket::Topic::ApplicationList, asApplicationListJson());
         return Result::success(result);
     });
 }
@@ -197,6 +213,45 @@ bool Service::save()
 QJsonObject Service::asJson() const
 {
     return m_configuration.toJson();
+}
+
+QJsonObject Service::asSystemConfigJson() const
+{
+    return QJsonObject{
+        {"device_id", m_configuration.deviceId},
+        {"system-configuration", m_configuration.systemConfiguration},
+    };
+}
+
+QJsonObject Service::asApplicationListJson() const
+{
+    QJsonArray apps;
+    for (const QJsonObject& appConfig : m_configuration.applications) {
+        QJsonObject summary;
+        summary["id"] = appConfig.value("id");
+        summary["type"] = appConfig.value("type");
+        summary["name"] = appConfig.value("name");
+        summary["order"] = appConfig.value("order");
+        summary["watchface"] = appConfig.value("watchface");
+        apps.append(summary);
+    }
+
+    return QJsonObject{{"applications", apps}};
+}
+
+QJsonObject Service::asApplicationDetailJson(const QString& appId) const
+{
+    if (appId.isEmpty()) {
+        return QJsonObject();
+    }
+
+    for (const QJsonObject& appConfig : m_configuration.applications) {
+        if (appConfig.value("id").toString() == appId) {
+            return appConfig;
+        }
+    }
+
+    return QJsonObject();
 }
 
 int Service::brightness() const
